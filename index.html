@@ -486,7 +486,7 @@
             <button id="modeTUG" class="mode-btn" style="padding: 12px 20px; margin: 5px; background: #666; border-radius: 20px;">TUG</button>
         </div>
 
-        <p id="modeDescription" style="font-size: 12px;">환자 뒤에서 촬영하면<br>2m, 12m 통과를 자동 감지합니다</p>
+        <p id="modeDescription" style="font-size: 12px;">AR로 바닥에 2m, 12m 라인을<br>자동 배치하고 통과를 감지합니다</p>
         <button id="startBtn">측정 시작</button>
         <button id="guideBtn" style="background: #2196F3; margin-top: 20px; padding: 10px 30px; font-size: 14px;">📋 설치 가이드</button>
     </div>
@@ -626,6 +626,9 @@
         </div>
     </div>
 
+    <!-- Three.js for AR -->
+    <script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
+
     <!-- MediaPipe -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -668,6 +671,34 @@
 
         // 테스트 모드
         let testMode = '10MWT'; // '10MWT' 또는 'TUG'
+
+        // AR 관련 변수 (10M WT용)
+        let arSession = null;
+        let arRenderer = null;
+        let arScene = null;
+        let arCamera = null;
+        let hitTestSource = null;
+        let localReferenceSpace = null;
+        let reticle = null;
+        let arSupported = false;
+
+        // AR 설정 단계
+        const ARSetupState = {
+            CHECKING: 0,      // AR 지원 확인 중
+            FINDING_FLOOR: 1, // 바닥 찾는 중
+            PLACE_START: 2,   // 시작점 배치
+            PLACE_DIRECTION: 3, // 방향 설정
+            READY: 4          // 설정 완료, 측정 준비
+        };
+        let arSetupState = ARSetupState.CHECKING;
+
+        // AR 마커 및 라인
+        let startMarker = null;
+        let directionMarker = null;
+        let line2m = null;
+        let line12m = null;
+        let startPoint3D = null;
+        let directionVector = null;
 
         // 상태 변수 (10M WT)
         const MeasureState = {
@@ -735,12 +766,250 @@
             animationId = requestAnimationFrame(processFrame);
         }
 
-        // MediaPipe 초기화
-        async function initPose() {
+        // ===== AR 관련 함수 (10M WT용) =====
+
+        // AR 지원 확인
+        async function checkARSupport() {
+            if (!navigator.xr) {
+                return false;
+            }
+            try {
+                return await navigator.xr.isSessionSupported('immersive-ar');
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // AR Three.js 초기화
+        function initARThree() {
+            arScene = new THREE.Scene();
+            arCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+            arScene.add(light);
+
+            arRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            arRenderer.setPixelRatio(window.devicePixelRatio);
+            arRenderer.setSize(window.innerWidth, window.innerHeight);
+            arRenderer.xr.enabled = true;
+            document.body.appendChild(arRenderer.domElement);
+
+            // Reticle (바닥 표시용 원)
+            const geometry = new THREE.RingGeometry(0.08, 0.1, 32);
+            geometry.rotateX(-Math.PI / 2);
+            const material = new THREE.MeshBasicMaterial({ color: 0x4CAF50 });
+            reticle = new THREE.Mesh(geometry, material);
+            reticle.visible = false;
+            arScene.add(reticle);
+        }
+
+        // AR 세션 시작
+        async function startARSession() {
+            try {
+                loading.style.display = 'flex';
+                loading.querySelector('p').textContent = 'AR 시작 중...';
+
+                arSession = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: { root: document.body }
+                });
+
+                initARThree();
+
+                arRenderer.xr.setReferenceSpaceType('local');
+                await arRenderer.xr.setSession(arSession);
+
+                localReferenceSpace = await arSession.requestReferenceSpace('local');
+                const viewerSpace = await arSession.requestReferenceSpace('viewer');
+                hitTestSource = await arSession.requestHitTestSource({ space: viewerSpace });
+
+                arSession.addEventListener('select', onARSelect);
+                arSession.addEventListener('end', onARSessionEnd);
+
+                arSetupState = ARSetupState.FINDING_FLOOR;
+                loading.style.display = 'none';
+                startScreen.classList.add('hidden');
+                overlay.classList.remove('hidden');
+                buttons.style.display = 'flex';
+
+                statusEl.textContent = '📱 바닥을 비춰주세요';
+                infoEl.textContent = '천천히 좌우로 움직여보세요';
+
+                arRenderer.setAnimationLoop(arRenderLoop);
+
+            } catch (error) {
+                loading.style.display = 'none';
+                alert('AR 시작 실패: ' + error.message);
+            }
+        }
+
+        // AR 렌더 루프
+        function arRenderLoop(timestamp, frame) {
+            if (frame && hitTestSource) {
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+                if (hitTestResults.length > 0) {
+                    const hit = hitTestResults[0];
+                    const pose = hit.getPose(localReferenceSpace);
+
+                    reticle.visible = true;
+                    reticle.matrix.fromArray(pose.transform.matrix);
+                    reticle.matrix.decompose(reticle.position, reticle.quaternion, reticle.scale);
+
+                    if (arSetupState === ARSetupState.FINDING_FLOOR) {
+                        arSetupState = ARSetupState.PLACE_START;
+                        statusEl.textContent = '1️⃣ 시작점(0m)을 터치하세요';
+                        infoEl.textContent = '환자가 출발할 위치를 선택하세요';
+                    }
+                } else {
+                    reticle.visible = false;
+                }
+            }
+
+            arRenderer.render(arScene, arCamera);
+        }
+
+        // AR 터치 이벤트
+        function onARSelect() {
+            if (!reticle.visible) return;
+
+            const position = reticle.position.clone();
+
+            if (arSetupState === ARSetupState.PLACE_START) {
+                // 시작점 배치
+                startPoint3D = position.clone();
+                createStartMarker(position);
+                arSetupState = ARSetupState.PLACE_DIRECTION;
+                statusEl.textContent = '2️⃣ 진행 방향을 터치하세요';
+                infoEl.textContent = '12m 지점 방향을 선택하세요';
+
+            } else if (arSetupState === ARSetupState.PLACE_DIRECTION) {
+                // 방향 설정 및 거리 라인 생성
+                const direction = new THREE.Vector3(
+                    position.x - startPoint3D.x,
+                    0,
+                    position.z - startPoint3D.z
+                );
+
+                if (direction.length() > 0.3) {
+                    directionVector = direction.normalize();
+                    createDistanceLines(startPoint3D, directionVector);
+                    arSetupState = ARSetupState.READY;
+
+                    statusEl.textContent = '✅ 설정 완료!';
+                    infoEl.textContent = '환자가 2m 라인을 통과하면 자동 시작';
+
+                    // 3초 후 측정 모드로 전환
+                    setTimeout(() => {
+                        endARAndStartPose();
+                    }, 2000);
+                } else {
+                    infoEl.textContent = '⚠️ 더 멀리 터치하세요';
+                }
+            }
+        }
+
+        // 시작점 마커 생성
+        function createStartMarker(position) {
+            const geometry = new THREE.SphereGeometry(0.1, 32, 32);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 0.3
+            });
+            startMarker = new THREE.Mesh(geometry, material);
+            startMarker.position.copy(position);
+            startMarker.position.y += 0.1;
+            arScene.add(startMarker);
+        }
+
+        // 거리 라인 생성 (2m, 12m)
+        function createDistanceLines(startPos, direction) {
+            const distances = [2, 12];
+            const colors = [0x00ff00, 0xff0000]; // 초록(2m), 빨강(12m)
+
+            distances.forEach((dist, index) => {
+                const linePos = new THREE.Vector3(
+                    startPos.x + direction.x * dist,
+                    startPos.y + 0.02,
+                    startPos.z + direction.z * dist
+                );
+
+                // 라인 생성 (넓은 링)
+                const ringGeometry = new THREE.RingGeometry(0.4, 0.5, 64);
+                ringGeometry.rotateX(-Math.PI / 2);
+                const ringMaterial = new THREE.MeshStandardMaterial({
+                    color: colors[index],
+                    emissive: colors[index],
+                    emissiveIntensity: 0.5,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.position.copy(linePos);
+                arScene.add(ring);
+
+                // 텍스트 라벨
+                const label = createTextSprite(`${dist}m`, colors[index]);
+                label.position.copy(linePos);
+                label.position.y += 0.5;
+                arScene.add(label);
+            });
+        }
+
+        // 텍스트 스프라이트 생성
+        function createTextSprite(text, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.roundRect(10, 10, 236, 108, 20);
+            ctx.fill();
+
+            ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+            ctx.font = 'bold 64px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 128, 64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(0.5, 0.25, 1);
+
+            return sprite;
+        }
+
+        // AR 종료 후 Pose 측정 시작
+        async function endARAndStartPose() {
+            // AR 세션 종료
+            if (arSession) {
+                await arSession.end();
+            }
+            // Pose 측정 시작
+            await initPoseOnly();
+        }
+
+        // AR 세션 종료 이벤트
+        function onARSessionEnd() {
+            arSession = null;
+            hitTestSource = null;
+            if (arRenderer && arRenderer.domElement) {
+                arRenderer.domElement.remove();
+            }
+        }
+
+        // Pose만 초기화 (AR 라인 설정 후)
+        async function initPoseOnly() {
             loading.style.display = 'flex';
+            loading.querySelector('p').textContent = 'AI 모델 로딩 중...';
 
             try {
-                // 1. 먼저 카메라 시작
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: 'environment',
@@ -750,28 +1019,21 @@
                 });
                 video.srcObject = stream;
 
-                // 비디오 메타데이터 로드 대기
                 await new Promise((resolve) => {
-                    video.onloadedmetadata = () => {
-                        resolve();
-                    };
+                    video.onloadedmetadata = () => resolve();
                 });
 
                 await video.play();
 
-                // 캔버스 크기 설정
                 canvas.width = video.videoWidth || 640;
                 canvas.height = video.videoHeight || 480;
 
-                // 2. MediaPipe Pose 초기화
                 pose = new Pose({
-                    locateFile: (file) => {
-                        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
-                    }
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
                 });
 
                 pose.setOptions({
-                    modelComplexity: 0,  // 0 = lite (더 빠름)
+                    modelComplexity: 0,
                     smoothLandmarks: true,
                     enableSegmentation: false,
                     minDetectionConfidence: 0.5,
@@ -780,7 +1042,88 @@
 
                 pose.onResults(onPoseResults);
 
-                // 3. 프레임 처리 시작
+                isProcessing = true;
+                processFrame();
+
+                loading.style.display = 'none';
+                videoContainer.classList.remove('hidden');
+                overlay.classList.remove('hidden');
+                buttons.style.display = 'flex';
+                gateControls.style.display = 'none'; // 슬라이더 숨김
+                detectionStatus.style.display = 'block';
+
+                // 게이트 라인 표시 (AR에서 설정된 위치 사용)
+                gate2mLine.style.display = 'block';
+                gate12mLine.style.display = 'block';
+
+                measureState = MeasureState.WAITING;
+                lastDetectedTime = performance.now();
+
+                statusEl.textContent = '대기 중...';
+                infoEl.textContent = '환자가 2m 라인을 통과하면 자동 시작';
+
+            } catch (error) {
+                loading.style.display = 'none';
+                alert('카메라 시작 실패: ' + error.message);
+            }
+        }
+
+        // 측정 시작 (모드에 따라 다르게 처리)
+        async function initPose() {
+            if (testMode === '10MWT') {
+                // 10M WT: AR 지원 확인 후 AR 또는 일반 모드로 시작
+                arSupported = await checkARSupport();
+                if (arSupported) {
+                    await startARSession();
+                } else {
+                    // AR 미지원 시 일반 카메라 모드 + 슬라이더
+                    alert('AR이 지원되지 않습니다.\n슬라이더로 라인 위치를 조절해주세요.');
+                    await initPoseWithSliders();
+                }
+            } else {
+                // TUG: 카메라만 사용
+                await initPoseWithSliders();
+            }
+        }
+
+        // 일반 카메라 + 슬라이더 모드
+        async function initPoseWithSliders() {
+            loading.style.display = 'flex';
+            loading.querySelector('p').textContent = 'AI 모델 로딩 중...';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = stream;
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => resolve();
+                });
+
+                await video.play();
+
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+
+                pose = new Pose({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+                });
+
+                pose.setOptions({
+                    modelComplexity: 0,
+                    smoothLandmarks: true,
+                    enableSegmentation: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                pose.onResults(onPoseResults);
+
                 isProcessing = true;
                 processFrame();
 
@@ -789,10 +1132,15 @@
                 videoContainer.classList.remove('hidden');
                 overlay.classList.remove('hidden');
                 buttons.style.display = 'flex';
-                gateControls.style.display = 'flex';
                 detectionStatus.style.display = 'block';
 
-                // 초기 상태 설정 (테스트 모드에 따라)
+                // TUG는 슬라이더 숨김, 10M WT는 AR 미지원 시에만 슬라이더 표시
+                if (testMode === 'TUG') {
+                    gateControls.style.display = 'none';
+                } else {
+                    gateControls.style.display = 'flex';
+                }
+
                 lastDetectedTime = performance.now();
                 resetMeasurement();
 
@@ -1239,7 +1587,11 @@
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
+            if (arSession) {
+                arSession.end();
+            }
             pose = null;
+            arSetupState = ARSetupState.CHECKING;
             startScreen.classList.remove('hidden');
             videoContainer.classList.add('hidden');
             overlay.classList.add('hidden');
@@ -1404,7 +1756,7 @@
             mode10MWTBtn.classList.add('active');
             modeTUGBtn.classList.remove('active');
             modeTUGBtn.style.background = '#666';
-            modeDescription.innerHTML = '환자 뒤에서 촬영하면<br>2m, 12m 통과를 자동 감지합니다';
+            modeDescription.innerHTML = 'AR로 바닥에 2m, 12m 라인을<br>자동 배치하고 통과를 감지합니다';
         });
 
         modeTUGBtn.addEventListener('click', () => {
