@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대시보드 - AR 보행 측정</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #6366F1;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg-dark: #0F172A;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-glass: rgba(255, 255, 255, 0.08);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            color: var(--text-primary);
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 36px;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .user-name {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .btn-logout {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-logout:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+        }
+
+        /* Main Content */
+        .main {
+            padding: 84px 20px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Stats Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: var(--bg-glass);
+            padding: 6px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: var(--bg-card);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary), #4F46E5);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #DC2626);
+            color: white;
+        }
+
+        .btn-outline {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Patient List */
+        .patient-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .patient-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .patient-item:hover {
+            border-color: var(--primary);
+        }
+
+        .patient-info {
+            flex: 1;
+        }
+
+        .patient-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .patient-details {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .patient-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-dark);
+            border-radius: 20px;
+            padding: 32px;
+            width: 100%;
+            max-width: 480px;
+            border: 1px solid var(--border);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        /* Measurement History */
+        .measurement-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .measurement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .measurement-time {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .measurement-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .measurement-type {
+            padding: 4px 10px;
+            background: var(--secondary);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .header {
+                padding: 0 16px;
+            }
+
+            .main {
+                padding: 76px 16px 16px;
+            }
+
+            .patient-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .patient-actions {
+                width: 100%;
+            }
+
+            .patient-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <img src="logo.jpeg" alt="THYM" class="header-logo">
+            <span class="header-title">AR 보행 측정</span>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <span class="user-name" id="userName">로딩 중...</span>
+            </div>
+            <button class="btn-logout" id="logoutBtn">로그아웃</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="patientCount">0</div>
+                <div class="stat-label">등록 환자</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="measurementCount">0</div>
+                <div class="stat-label">총 측정</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="todayCount">0</div>
+                <div class="stat-label">오늘 측정</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="patients">환자 목록</button>
+            <button class="tab" data-tab="measurements">측정 기록</button>
+        </div>
+
+        <!-- Patients Tab -->
+        <div id="patientsTab" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">내 환자 목록</h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" id="exportPatientsBtn">CSV 내보내기</button>
+                        <button class="btn btn-primary" id="addPatientBtn">+ 환자 추가</button>
+                    </div>
+                </div>
+                <div id="patientList" class="patient-list">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>환자 목록 로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Measurements Tab -->
+        <div id="measurementsTab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">측정 기록</h2>
+                    <button class="btn btn-outline" id="exportMeasurementsBtn">CSV 내보내기</button>
+                </div>
+                <div id="measurementList" class="measurement-list">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>측정 기록 로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Patient Modal -->
+    <div class="modal-overlay" id="patientModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">환자 추가</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <form id="patientForm">
+                <input type="hidden" id="patientId">
+                <div class="form-group">
+                    <label for="patientName">이름 *</label>
+                    <input type="text" id="patientName" placeholder="환자 이름" required>
+                </div>
+                <div class="form-group">
+                    <label for="patientBirth">생년월일</label>
+                    <input type="date" id="patientBirth">
+                </div>
+                <div class="form-group">
+                    <label for="patientPhone">연락처</label>
+                    <input type="tel" id="patientPhone" placeholder="010-0000-0000">
+                </div>
+                <div class="form-group">
+                    <label for="patientMemo">메모</label>
+                    <textarea id="patientMemo" placeholder="특이사항, 진단명 등"></textarea>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" class="btn btn-outline" style="flex: 1;" id="cancelBtn">취소</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Patient Detail Modal -->
+    <div class="modal-overlay" id="patientDetailModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="detailPatientName">환자 상세</h3>
+                <button class="modal-close" id="closeDetailModal">&times;</button>
+            </div>
+            <div id="patientDetailContent">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button class="btn btn-primary" style="flex: 1;" id="startMeasureBtn">측정 시작</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script>
+        let currentUser = null;
+        let patientsList = [];
+        let measurementsList = [];
+
+        // DOM Elements
+        const userNameEl = document.getElementById('userName');
+        const patientCountEl = document.getElementById('patientCount');
+        const measurementCountEl = document.getElementById('measurementCount');
+        const todayCountEl = document.getElementById('todayCount');
+        const patientListEl = document.getElementById('patientList');
+        const measurementListEl = document.getElementById('measurementList');
+        const patientModal = document.getElementById('patientModal');
+        const patientDetailModal = document.getElementById('patientDetailModal');
+        const patientForm = document.getElementById('patientForm');
+
+        // Check authentication
+        async function checkAuth() {
+            currentUser = await auth.getCurrentUser();
+            if (!currentUser) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Redirect admin to admin page
+            if (currentUser.profile?.role === 'admin') {
+                window.location.href = 'admin.html';
+                return;
+            }
+
+            userNameEl.textContent = currentUser.profile?.name || currentUser.email;
+            loadData();
+        }
+
+        // Load all data
+        async function loadData() {
+            await Promise.all([
+                loadPatients(),
+                loadMeasurements()
+            ]);
+            updateStats();
+        }
+
+        // Load patients
+        async function loadPatients() {
+            try {
+                patientsList = await patients.getMyPatients();
+                renderPatients();
+            } catch (error) {
+                console.error('Error loading patients:', error);
+                patientListEl.innerHTML = '<div class="empty-state"><p>환자 목록을 불러올 수 없습니다.</p></div>';
+            }
+        }
+
+        // Load measurements
+        async function loadMeasurements() {
+            try {
+                measurementsList = await measurements.getMyMeasurements();
+                renderMeasurements();
+            } catch (error) {
+                console.error('Error loading measurements:', error);
+            }
+        }
+
+        // Render patients list
+        function renderPatients() {
+            if (patientsList.length === 0) {
+                patientListEl.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👤</div>
+                        <p>등록된 환자가 없습니다.</p>
+                        <p style="font-size: 13px; margin-top: 8px;">환자를 추가하여 측정을 시작하세요.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            patientListEl.innerHTML = patientsList.map(patient => `
+                <div class="patient-item" data-id="${patient.id}">
+                    <div class="patient-info">
+                        <div class="patient-name">${patient.name}</div>
+                        <div class="patient-details">
+                            ${patient.birth_date ? formatDate(patient.birth_date) + ' | ' : ''}
+                            ${patient.phone || '연락처 없음'}
+                        </div>
+                    </div>
+                    <div class="patient-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="viewPatient('${patient.id}')">상세</button>
+                        <button class="btn btn-sm btn-outline" onclick="editPatient('${patient.id}')">수정</button>
+                        <button class="btn btn-sm btn-danger" onclick="deletePatient('${patient.id}')">삭제</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render measurements list
+        function renderMeasurements() {
+            if (measurementsList.length === 0) {
+                measurementListEl.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <p>측정 기록이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            measurementListEl.innerHTML = measurementsList.map(m => `
+                <div class="measurement-item">
+                    <div>
+                        <div class="measurement-time">${m.time_formatted}</div>
+                        <div class="measurement-meta">${m.patients?.name || '알 수 없음'} | ${formatDateTime(m.created_at)}</div>
+                    </div>
+                    <span class="measurement-type">${m.test_type}</span>
+                </div>
+            `).join('');
+        }
+
+        // Update stats
+        function updateStats() {
+            patientCountEl.textContent = patientsList.length;
+            measurementCountEl.textContent = measurementsList.length;
+
+            // Count today's measurements
+            const today = new Date().toDateString();
+            const todayMeasurements = measurementsList.filter(m =>
+                new Date(m.created_at).toDateString() === today
+            );
+            todayCountEl.textContent = todayMeasurements.length;
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('ko-KR');
+        }
+
+        // Format datetime
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleString('ko-KR', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Open add patient modal
+        function openAddPatientModal() {
+            document.getElementById('modalTitle').textContent = '환자 추가';
+            document.getElementById('patientId').value = '';
+            patientForm.reset();
+            patientModal.classList.add('active');
+        }
+
+        // Edit patient
+        function editPatient(id) {
+            const patient = patientsList.find(p => p.id === id);
+            if (!patient) return;
+
+            document.getElementById('modalTitle').textContent = '환자 수정';
+            document.getElementById('patientId').value = patient.id;
+            document.getElementById('patientName').value = patient.name || '';
+            document.getElementById('patientBirth').value = patient.birth_date || '';
+            document.getElementById('patientPhone').value = patient.phone || '';
+            document.getElementById('patientMemo').value = patient.memo || '';
+            patientModal.classList.add('active');
+        }
+
+        // View patient detail
+        async function viewPatient(id) {
+            const patient = patientsList.find(p => p.id === id);
+            if (!patient) return;
+
+            document.getElementById('detailPatientName').textContent = patient.name;
+
+            // Load patient measurements
+            const patientMeasurements = await measurements.getPatientMeasurements(id);
+
+            let content = `
+                <div style="margin-bottom: 20px;">
+                    <p style="color: var(--text-muted); font-size: 13px;">생년월일</p>
+                    <p>${patient.birth_date ? formatDate(patient.birth_date) : '-'}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: var(--text-muted); font-size: 13px;">연락처</p>
+                    <p>${patient.phone || '-'}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: var(--text-muted); font-size: 13px;">메모</p>
+                    <p>${patient.memo || '-'}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">측정 기록 (${patientMeasurements.length}회)</p>
+            `;
+
+            if (patientMeasurements.length > 0) {
+                content += '<div class="measurement-list" style="max-height: 200px;">';
+                content += patientMeasurements.map(m => `
+                    <div class="measurement-item">
+                        <div>
+                            <div class="measurement-time">${m.time_formatted}</div>
+                            <div class="measurement-meta">${formatDateTime(m.created_at)}</div>
+                        </div>
+                        <span class="measurement-type">${m.test_type}</span>
+                    </div>
+                `).join('');
+                content += '</div>';
+            } else {
+                content += '<p style="color: var(--text-muted);">측정 기록이 없습니다.</p>';
+            }
+
+            content += '</div>';
+
+            document.getElementById('patientDetailContent').innerHTML = content;
+            document.getElementById('startMeasureBtn').onclick = () => {
+                // Store selected patient and go to measurement page
+                sessionStorage.setItem('selectedPatient', JSON.stringify(patient));
+                window.location.href = 'index.html';
+            };
+
+            patientDetailModal.classList.add('active');
+        }
+
+        // Delete patient
+        async function deletePatient(id) {
+            const patient = patientsList.find(p => p.id === id);
+            if (!patient) return;
+
+            if (!confirm(`"${patient.name}" 환자를 삭제하시겠습니까?\n관련된 측정 기록도 모두 삭제됩니다.`)) {
+                return;
+            }
+
+            try {
+                await patients.deletePatient(id);
+                await loadData();
+            } catch (error) {
+                alert('삭제 실패: ' + error.message);
+            }
+        }
+
+        // Save patient
+        async function savePatient(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('patientId').value;
+            const data = {
+                name: document.getElementById('patientName').value.trim(),
+                birth_date: document.getElementById('patientBirth').value || null,
+                phone: document.getElementById('patientPhone').value.trim() || null,
+                memo: document.getElementById('patientMemo').value.trim() || null
+            };
+
+            if (!data.name) {
+                alert('이름을 입력해주세요.');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await patients.updatePatient(id, data);
+                } else {
+                    await patients.addPatient(data);
+                }
+                patientModal.classList.remove('active');
+                await loadData();
+            } catch (error) {
+                alert('저장 실패: ' + error.message);
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+            });
+        });
+
+        // Event listeners
+        document.getElementById('addPatientBtn').addEventListener('click', openAddPatientModal);
+        document.getElementById('closeModal').addEventListener('click', () => patientModal.classList.remove('active'));
+        document.getElementById('cancelBtn').addEventListener('click', () => patientModal.classList.remove('active'));
+        document.getElementById('closeDetailModal').addEventListener('click', () => patientDetailModal.classList.remove('active'));
+        patientForm.addEventListener('submit', savePatient);
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        // Export buttons
+        document.getElementById('exportPatientsBtn').addEventListener('click', () => {
+            const exportData = patientsList.map(p => ({
+                이름: p.name,
+                생년월일: p.birth_date || '',
+                연락처: p.phone || '',
+                메모: p.memo || '',
+                등록일: formatDateTime(p.created_at)
+            }));
+            exportToExcel(exportData, 'patients');
+        });
+
+        document.getElementById('exportMeasurementsBtn').addEventListener('click', () => {
+            const exportData = measurementsList.map(m => ({
+                환자: m.patients?.name || '',
+                테스트: m.test_type,
+                시간_ms: m.time_ms,
+                시간: m.time_formatted,
+                측정일: formatDateTime(m.created_at)
+            }));
+            exportToExcel(exportData, 'measurements');
+        });
+
+        // Close modals on overlay click
+        patientModal.addEventListener('click', (e) => {
+            if (e.target === patientModal) patientModal.classList.remove('active');
+        });
+        patientDetailModal.addEventListener('click', (e) => {
+            if (e.target === patientDetailModal) patientDetailModal.classList.remove('active');
+        });
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>

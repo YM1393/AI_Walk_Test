@@ -648,6 +648,18 @@
         <h1>AI 보행 측정</h1>
         <p>물리치료 임상 보조 소프트웨어</p>
 
+        <!-- 선택된 환자 정보 -->
+        <div id="selectedPatientInfo" style="display: none; background: var(--bg-glass); border: 1px solid var(--border); border-radius: 16px; padding: 16px 24px; margin: 20px 0; text-align: center;">
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">선택된 환자</p>
+            <p id="selectedPatientName" style="font-size: 18px; font-weight: 600; color: var(--primary);"></p>
+        </div>
+
+        <!-- 환자 미선택 안내 -->
+        <div id="noPatientWarning" style="display: none; background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warning); border-radius: 16px; padding: 16px 24px; margin: 20px 0; text-align: center;">
+            <p style="font-size: 14px; color: var(--warning);">환자를 선택해주세요</p>
+            <button id="selectPatientBtn" style="margin-top: 12px; padding: 10px 24px; font-size: 14px; background: linear-gradient(135deg, var(--warning), #D97706);">환자 선택하러 가기</button>
+        </div>
+
         <!-- 테스트 모드 선택 -->
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">테스트 모드</p>
         <div id="testModeSelector">
@@ -658,6 +670,7 @@
         <p id="modeDescription" style="font-size: 13px; color: var(--text-secondary); max-width: 280px; line-height: 1.6;">AR로 바닥에 2m, 12m 라인을<br>자동 배치하고 통과를 감지합니다</p>
         <button id="startBtn" style="margin-top: 24px; padding: 16px 48px; font-size: 17px;">측정 시작</button>
         <button id="guideBtn" style="background: linear-gradient(135deg, var(--secondary), #4F46E5); margin-top: 16px; padding: 12px 32px; font-size: 14px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);">설치 가이드</button>
+        <button id="backToDashboardBtn" style="background: var(--bg-glass); border: 1px solid var(--border); margin-top: 12px; padding: 10px 24px; font-size: 13px; box-shadow: none;">대시보드로 돌아가기</button>
     </div>
 
     <!-- 경고 배너 -->
@@ -806,6 +819,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+    <!-- Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
 
     <script>
         // DOM 요소
@@ -1784,6 +1801,46 @@
 
         // ===== 결과 저장 및 리포트 =====
 
+        // 선택된 환자
+        let selectedPatient = null;
+        let currentUser = null;
+
+        // 인증 및 환자 선택 확인
+        async function checkAuthAndPatient() {
+            try {
+                currentUser = await auth.getCurrentUser();
+                if (!currentUser) {
+                    // 로그인 필요
+                    document.getElementById('noPatientWarning').style.display = 'block';
+                    document.getElementById('noPatientWarning').innerHTML = `
+                        <p style="font-size: 14px; color: var(--warning);">로그인이 필요합니다</p>
+                        <button onclick="window.location.href='login.html'" style="margin-top: 12px; padding: 10px 24px; font-size: 14px; background: linear-gradient(135deg, var(--warning), #D97706); border: none; border-radius: 10px; color: white; cursor: pointer;">로그인하기</button>
+                    `;
+                    document.getElementById('startBtn').disabled = true;
+                    return false;
+                }
+
+                // 선택된 환자 확인
+                const patientData = sessionStorage.getItem('selectedPatient');
+                if (patientData) {
+                    selectedPatient = JSON.parse(patientData);
+                    document.getElementById('selectedPatientInfo').style.display = 'block';
+                    document.getElementById('selectedPatientName').textContent = selectedPatient.name;
+                    document.getElementById('noPatientWarning').style.display = 'none';
+                    document.getElementById('startBtn').disabled = false;
+                } else {
+                    document.getElementById('selectedPatientInfo').style.display = 'none';
+                    document.getElementById('noPatientWarning').style.display = 'block';
+                    document.getElementById('startBtn').disabled = true;
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Auth check error:', error);
+                return false;
+            }
+        }
+
         const STORAGE_KEY_10MWT = 'ar_measure_results_10mwt';
         const STORAGE_KEY_TUG = 'ar_measure_results_tug';
 
@@ -1791,8 +1848,8 @@
             return testMode === 'TUG' ? STORAGE_KEY_TUG : STORAGE_KEY_10MWT;
         }
 
-        // 결과 저장
-        function saveResult() {
+        // 결과 저장 (Supabase에 저장)
+        async function saveResult() {
             let elapsed;
             if (testMode === '10MWT') {
                 elapsed = gateTimes['12m'] - gateTimes['2m'];
@@ -1800,10 +1857,35 @@
                 elapsed = gateTimes['sit'] - gateTimes['stand'];
             }
 
+            const timeFormatted = formatTime(elapsed);
+
+            // Supabase에 저장
+            if (selectedPatient && currentUser) {
+                try {
+                    await measurements.addMeasurement(
+                        selectedPatient.id,
+                        testMode,
+                        elapsed,
+                        timeFormatted
+                    );
+                    alert(`${testMode} 결과 저장 완료!\n환자: ${selectedPatient.name}\n측정 시간: ${timeFormatted}`);
+                } catch (error) {
+                    alert('저장 실패: ' + error.message);
+                    // Fallback to localStorage
+                    saveToLocalStorage(elapsed, timeFormatted);
+                }
+            } else {
+                // 환자 미선택 시 localStorage에 저장
+                saveToLocalStorage(elapsed, timeFormatted);
+            }
+        }
+
+        // localStorage 백업 저장
+        function saveToLocalStorage(elapsed, timeFormatted) {
             const result = {
                 id: Date.now(),
                 time: elapsed,
-                timeFormatted: formatTime(elapsed),
+                timeFormatted: timeFormatted,
                 date: new Date().toISOString(),
                 device: navigator.userAgent,
                 testType: testMode
@@ -1814,7 +1896,7 @@
             results.push(result);
             localStorage.setItem(storageKey, JSON.stringify(results));
 
-            alert(`${testMode} 결과 저장 완료!\n측정 시간: ${formatTime(elapsed)}\n총 ${results.length}회 기록됨`);
+            alert(`${testMode} 결과 저장 완료! (로컬)\n측정 시간: ${timeFormatted}\n총 ${results.length}회 기록됨`);
         }
 
         // 통계 계산
@@ -1977,6 +2059,19 @@
         document.getElementById('closeReportBtn').addEventListener('click', () => {
             document.getElementById('reportScreen').style.display = 'none';
         });
+
+        // 환자 선택 버튼
+        document.getElementById('selectPatientBtn')?.addEventListener('click', () => {
+            window.location.href = 'dashboard.html';
+        });
+
+        // 대시보드로 돌아가기 버튼
+        document.getElementById('backToDashboardBtn')?.addEventListener('click', () => {
+            window.location.href = 'dashboard.html';
+        });
+
+        // 페이지 로드 시 인증 및 환자 선택 확인
+        checkAuthAndPatient();
     </script>
 </body>
 </html>

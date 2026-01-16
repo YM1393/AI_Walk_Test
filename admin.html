@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 - AR 보행 측정</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #6366F1;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg-dark: #0F172A;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-glass: rgba(255, 255, 255, 0.08);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            color: var(--text-primary);
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 36px;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .admin-badge {
+            padding: 4px 10px;
+            background: linear-gradient(135deg, var(--danger), #DC2626);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-logout {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-logout:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+        }
+
+        /* Main Content */
+        .main {
+            padding: 84px 20px 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Stats Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-card.highlight {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), transparent);
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: var(--bg-glass);
+            padding: 6px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .tab {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: var(--bg-card);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary), #4F46E5);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #DC2626);
+            color: white;
+        }
+
+        .btn-outline {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: var(--bg-card);
+        }
+
+        .user-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--secondary), var(--primary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .user-email {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-therapist {
+            background: var(--secondary);
+        }
+
+        .badge-admin {
+            background: var(--danger);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Search */
+        .search-box {
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            width: 250px;
+            max-width: 100%;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 0 16px;
+            }
+
+            .main {
+                padding: 76px 16px 16px;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <img src="logo.jpeg" alt="THYM" class="header-logo">
+            <span class="header-title">AR 보행 측정</span>
+            <span class="admin-badge">관리자</span>
+        </div>
+        <div class="header-right">
+            <button class="btn-logout" id="logoutBtn">로그아웃</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="therapistCount">0</div>
+                <div class="stat-label">물리치료사</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="patientCount">0</div>
+                <div class="stat-label">등록 환자</div>
+            </div>
+            <div class="stat-card highlight">
+                <div class="stat-value" id="measurementCount">0</div>
+                <div class="stat-label">총 측정</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="todayCount">0</div>
+                <div class="stat-label">오늘 측정</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="therapists">물리치료사</button>
+            <button class="tab" data-tab="patients">환자 목록</button>
+            <button class="tab" data-tab="measurements">측정 기록</button>
+        </div>
+
+        <!-- Therapists Tab -->
+        <div id="therapistsTab" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">물리치료사 목록</h2>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" class="search-box" placeholder="검색..." id="therapistSearch">
+                        <button class="btn btn-outline" id="exportTherapistsBtn">CSV 내보내기</button>
+                    </div>
+                </div>
+                <div class="table-container" id="therapistTable">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patients Tab -->
+        <div id="patientsTab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">전체 환자 목록</h2>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" class="search-box" placeholder="검색..." id="patientSearch">
+                        <button class="btn btn-outline" id="exportPatientsBtn">CSV 내보내기</button>
+                    </div>
+                </div>
+                <div class="table-container" id="patientTable">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Measurements Tab -->
+        <div id="measurementsTab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">전체 측정 기록</h2>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" class="search-box" placeholder="검색..." id="measurementSearch">
+                        <button class="btn btn-outline" id="exportMeasurementsBtn">CSV 내보내기</button>
+                    </div>
+                </div>
+                <div class="table-container" id="measurementTable">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script>
+        let currentUser = null;
+        let therapistsList = [];
+        let patientsList = [];
+        let measurementsList = [];
+
+        // Check authentication
+        async function checkAuth() {
+            currentUser = await auth.getCurrentUser();
+            if (!currentUser) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Only admin can access this page
+            if (currentUser.profile?.role !== 'admin') {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            loadData();
+        }
+
+        // Load all data
+        async function loadData() {
+            await Promise.all([
+                loadTherapists(),
+                loadPatients(),
+                loadMeasurements()
+            ]);
+            updateStats();
+        }
+
+        // Load therapists
+        async function loadTherapists() {
+            try {
+                therapistsList = await therapists.getAllTherapists();
+                renderTherapists();
+            } catch (error) {
+                console.error('Error loading therapists:', error);
+            }
+        }
+
+        // Load patients
+        async function loadPatients() {
+            try {
+                patientsList = await patients.getAllPatients();
+                renderPatients();
+            } catch (error) {
+                console.error('Error loading patients:', error);
+            }
+        }
+
+        // Load measurements
+        async function loadMeasurements() {
+            try {
+                measurementsList = await measurements.getAllMeasurements();
+                renderMeasurements();
+            } catch (error) {
+                console.error('Error loading measurements:', error);
+            }
+        }
+
+        // Format datetime
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Get initials
+        function getInitials(name) {
+            if (!name) return '?';
+            return name.charAt(0).toUpperCase();
+        }
+
+        // Render therapists
+        function renderTherapists(searchTerm = '') {
+            let filtered = therapistsList;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = therapistsList.filter(t =>
+                    t.name?.toLowerCase().includes(term) ||
+                    t.email?.toLowerCase().includes(term)
+                );
+            }
+
+            if (filtered.length === 0) {
+                document.getElementById('therapistTable').innerHTML = `
+                    <div class="empty-state">
+                        <p>등록된 물리치료사가 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('therapistTable').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>이름</th>
+                            <th>이메일</th>
+                            <th>환자 수</th>
+                            <th>가입일</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.map(t => {
+                            const patientCount = patientsList.filter(p => p.therapist_id === t.id).length;
+                            return `
+                                <tr>
+                                    <td>
+                                        <div class="user-cell">
+                                            <div class="user-avatar">${getInitials(t.name)}</div>
+                                            <div>
+                                                <div class="user-name">${t.name || '이름 없음'}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>${t.email}</td>
+                                    <td>${patientCount}명</td>
+                                    <td>${formatDateTime(t.created_at)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Render patients
+        function renderPatients(searchTerm = '') {
+            let filtered = patientsList;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = patientsList.filter(p =>
+                    p.name?.toLowerCase().includes(term) ||
+                    p.phone?.includes(term) ||
+                    p.users?.name?.toLowerCase().includes(term)
+                );
+            }
+
+            if (filtered.length === 0) {
+                document.getElementById('patientTable').innerHTML = `
+                    <div class="empty-state">
+                        <p>등록된 환자가 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('patientTable').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>환자명</th>
+                            <th>담당 치료사</th>
+                            <th>연락처</th>
+                            <th>등록일</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.map(p => `
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-avatar" style="background: linear-gradient(135deg, var(--warning), var(--danger));">${getInitials(p.name)}</div>
+                                        <div>
+                                            <div class="user-name">${p.name}</div>
+                                            <div class="user-email">${p.birth_date || ''}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>${p.users?.name || '-'}</td>
+                                <td>${p.phone || '-'}</td>
+                                <td>${formatDateTime(p.created_at)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Render measurements
+        function renderMeasurements(searchTerm = '') {
+            let filtered = measurementsList;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = measurementsList.filter(m =>
+                    m.patients?.name?.toLowerCase().includes(term) ||
+                    m.users?.name?.toLowerCase().includes(term) ||
+                    m.test_type?.toLowerCase().includes(term)
+                );
+            }
+
+            if (filtered.length === 0) {
+                document.getElementById('measurementTable').innerHTML = `
+                    <div class="empty-state">
+                        <p>측정 기록이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('measurementTable').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>환자</th>
+                            <th>치료사</th>
+                            <th>테스트</th>
+                            <th>시간</th>
+                            <th>측정일</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.map(m => `
+                            <tr>
+                                <td>${m.patients?.name || '-'}</td>
+                                <td>${m.users?.name || '-'}</td>
+                                <td><span class="badge badge-therapist">${m.test_type}</span></td>
+                                <td style="font-weight: 600; color: var(--primary);">${m.time_formatted}</td>
+                                <td>${formatDateTime(m.created_at)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('therapistCount').textContent = therapistsList.length;
+            document.getElementById('patientCount').textContent = patientsList.length;
+            document.getElementById('measurementCount').textContent = measurementsList.length;
+
+            // Today's measurements
+            const today = new Date().toDateString();
+            const todayMeasurements = measurementsList.filter(m =>
+                new Date(m.created_at).toDateString() === today
+            );
+            document.getElementById('todayCount').textContent = todayMeasurements.length;
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+            });
+        });
+
+        // Search handlers
+        document.getElementById('therapistSearch').addEventListener('input', (e) => {
+            renderTherapists(e.target.value);
+        });
+
+        document.getElementById('patientSearch').addEventListener('input', (e) => {
+            renderPatients(e.target.value);
+        });
+
+        document.getElementById('measurementSearch').addEventListener('input', (e) => {
+            renderMeasurements(e.target.value);
+        });
+
+        // Export handlers
+        document.getElementById('exportTherapistsBtn').addEventListener('click', () => {
+            const exportData = therapistsList.map(t => ({
+                이름: t.name || '',
+                이메일: t.email,
+                가입일: formatDateTime(t.created_at)
+            }));
+            exportToExcel(exportData, 'therapists');
+        });
+
+        document.getElementById('exportPatientsBtn').addEventListener('click', () => {
+            const exportData = patientsList.map(p => ({
+                환자명: p.name,
+                담당치료사: p.users?.name || '',
+                생년월일: p.birth_date || '',
+                연락처: p.phone || '',
+                메모: p.memo || '',
+                등록일: formatDateTime(p.created_at)
+            }));
+            exportToExcel(exportData, 'all_patients');
+        });
+
+        document.getElementById('exportMeasurementsBtn').addEventListener('click', () => {
+            const exportData = measurementsList.map(m => ({
+                환자: m.patients?.name || '',
+                치료사: m.users?.name || '',
+                테스트: m.test_type,
+                시간_ms: m.time_ms,
+                시간: m.time_formatted,
+                측정일: formatDateTime(m.created_at)
+            }));
+            exportToExcel(exportData, 'all_measurements');
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>
