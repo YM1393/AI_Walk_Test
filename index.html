@@ -677,18 +677,14 @@
         };
         let measureState = MeasureState.WAITING;
 
-        // TUG 상태 변수
+        // TUG 상태 변수 (단순화: 일어서기/앉기만 감지)
         const TUGState = {
             WAITING_SIT: 0,      // 앉은 상태 대기
-            WAITING_STAND: 1,    // 일어서기 대기
-            WALKING_TO: 2,       // 3m 지점으로 이동 중
-            WALKING_BACK: 3,     // 돌아오는 중
-            WAITING_SIT_END: 4,  // 다시 앉기 대기
-            COMPLETE: 5          // 완료
+            WAITING_STAND: 1,    // 일어서기 대기 (측정 준비)
+            MEASURING: 2,        // 측정 중 (일어선 후)
+            COMPLETE: 3          // 완료 (다시 앉음)
         };
         let tugState = TUGState.WAITING_SIT;
-        let gate3mPosition = 40; // TUG 3m 라인 위치
-        let gate3mFrameCount = 0;
         let sitFrameCount = 0;
         let standFrameCount = 0;
         const SIT_STAND_FRAMES = 5; // 앉기/서기 감지 히스테리시스
@@ -967,7 +963,7 @@
             return null; // 불확실
         }
 
-        // TUG 게이트 통과 체크
+        // TUG 감지 (일어서기/앉기만)
         function checkTUGGatePass(footY, sitStandState) {
             if (tugState === TUGState.WAITING_SIT) {
                 // 앉은 상태 확인
@@ -976,7 +972,7 @@
                     if (sitFrameCount >= SIT_STAND_FRAMES) {
                         tugState = TUGState.WAITING_STAND;
                         statusEl.textContent = '✅ 앉은 상태 확인';
-                        infoEl.textContent = '"시작" 신호에 일어나세요';
+                        infoEl.textContent = '"시작" 신호와 함께 일어나세요';
                         sitFrameCount = 0;
                     }
                 } else {
@@ -993,29 +989,7 @@
                 } else {
                     standFrameCount = Math.max(0, standFrameCount - 1);
                 }
-            } else if (tugState === TUGState.WALKING_TO) {
-                // 3m 라인 통과 (가는 길)
-                if (footY <= gate3mPosition) {
-                    gate3mFrameCount++;
-                    if (gate3mFrameCount >= HYSTERESIS_FRAMES) {
-                        onTUG3mPass();
-                        gate3mFrameCount = 0;
-                    }
-                } else {
-                    gate3mFrameCount = Math.max(0, gate3mFrameCount - 1);
-                }
-            } else if (tugState === TUGState.WALKING_BACK) {
-                // 3m 라인 다시 통과 (오는 길) - footY가 다시 커짐
-                if (footY >= gate3mPosition + 10) {
-                    gate3mFrameCount++;
-                    if (gate3mFrameCount >= HYSTERESIS_FRAMES) {
-                        onTUGReturn();
-                        gate3mFrameCount = 0;
-                    }
-                } else {
-                    gate3mFrameCount = Math.max(0, gate3mFrameCount - 1);
-                }
-            } else if (tugState === TUGState.WAITING_SIT_END) {
+            } else if (tugState === TUGState.MEASURING) {
                 // 다시 앉기 감지 → 타이머 종료
                 if (sitStandState === 'sitting') {
                     sitFrameCount++;
@@ -1031,7 +1005,7 @@
 
         // TUG 이벤트 핸들러
         function onTUGStand() {
-            tugState = TUGState.WALKING_TO;
+            tugState = TUGState.MEASURING;
             gateTimes['stand'] = performance.now();
             timerStartTime = gateTimes['stand'];
             timerRunning = true;
@@ -1039,38 +1013,12 @@
             split2m.textContent = '일어섬!';
             split2m.classList.add('recorded');
 
-            gate2mLine.classList.remove('active');
-            gate2mLine.classList.add('passed');
-
-            statusEl.textContent = '🏃 3m 지점으로 이동';
-            infoEl.textContent = '3m 라인까지 걸어가세요';
+            statusEl.textContent = '🏃 측정 중...';
+            infoEl.textContent = '3m 콘을 돌아 의자에 앉으세요';
             timerDisplay.classList.add('running');
 
             updateTimerDisplay();
             if (navigator.vibrate) navigator.vibrate(200);
-        }
-
-        function onTUG3mPass() {
-            tugState = TUGState.WALKING_BACK;
-            gateTimes['3m'] = performance.now();
-
-            statusEl.textContent = '🔄 회전 후 돌아오기';
-            infoEl.textContent = '돌아서서 의자로 돌아가세요';
-
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        }
-
-        function onTUGReturn() {
-            tugState = TUGState.WAITING_SIT_END;
-            gateTimes['return'] = performance.now();
-
-            split12m.textContent = '복귀!';
-            split12m.classList.add('recorded');
-
-            statusEl.textContent = '🪑 의자에 앉기';
-            infoEl.textContent = '의자에 앉으면 측정 완료';
-
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         }
 
         function onTUGSitEnd() {
@@ -1079,6 +1027,9 @@
             timerRunning = false;
 
             const elapsed = gateTimes['sit'] - gateTimes['stand'];
+
+            split12m.textContent = '착석!';
+            split12m.classList.add('recorded');
 
             statusEl.textContent = '✅ TUG 측정 완료!';
             infoEl.textContent = '';
@@ -1258,21 +1209,24 @@
                 document.querySelector('#gate12mLine .gate-label').textContent = '12m 종료';
             } else if (testMode === 'TUG') {
                 tugState = TUGState.WAITING_SIT;
-                gateTimes = { 'stand': null, '3m': null, 'return': null, 'sit': null };
-                gate3mFrameCount = 0;
+                gateTimes = { 'stand': null, 'sit': null };
                 sitFrameCount = 0;
                 standFrameCount = 0;
 
                 split2m.textContent = '일어서기: 대기';
-                split12m.textContent = '복귀: 대기';
+                split12m.textContent = '착석: 대기';
                 statusEl.textContent = '앉은 상태 확인 중...';
                 infoEl.textContent = '환자가 의자에 앉아있는지 확인합니다';
 
-                // 게이트 라인 위치 (TUG - 3m만 사용)
-                gate2mLine.style.top = '75%';
-                gate12mLine.style.top = '40%';
-                document.querySelector('#gate2mLine .gate-label').textContent = '시작점';
-                document.querySelector('#gate12mLine .gate-label').textContent = '3m';
+                // TUG는 게이트 라인 숨김 (일어서기/앉기만 감지)
+                gate2mLine.style.display = 'none';
+                gate12mLine.style.display = 'none';
+            }
+
+            // 10M WT일 때 게이트 라인 표시
+            if (testMode === '10MWT') {
+                gate2mLine.style.display = 'block';
+                gate12mLine.style.display = 'block';
             }
         }
 
@@ -1458,7 +1412,7 @@
             modeTUGBtn.classList.add('active');
             mode10MWTBtn.classList.remove('active');
             mode10MWTBtn.style.background = '#666';
-            modeDescription.innerHTML = '의자에서 일어나 3m 왕복 후<br>다시 앉으면 자동 측정됩니다';
+            modeDescription.innerHTML = '의자에서 일어나면 타이머 시작<br>다시 앉으면 자동 종료됩니다';
         });
 
         // 이벤트 리스너
