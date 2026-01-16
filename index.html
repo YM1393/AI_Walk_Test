@@ -671,6 +671,8 @@
         <button id="startBtn" style="margin-top: 24px; padding: 16px 48px; font-size: 17px;">측정 시작</button>
         <button id="guideBtn" style="background: linear-gradient(135deg, var(--secondary), #4F46E5); margin-top: 16px; padding: 12px 32px; font-size: 14px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);">설치 가이드</button>
         <button id="backToDashboardBtn" style="background: var(--bg-glass); border: 1px solid var(--border); margin-top: 12px; padding: 10px 24px; font-size: 13px; box-shadow: none;">대시보드로 돌아가기</button>
+        <button id="loginBtn" style="background: var(--bg-glass); border: 1px solid var(--border); margin-top: 8px; padding: 10px 24px; font-size: 13px; box-shadow: none; display: none;">로그인</button>
+        <button id="logoutBtn" style="background: var(--bg-glass); border: 1px solid var(--danger); color: var(--danger); margin-top: 8px; padding: 10px 24px; font-size: 13px; box-shadow: none; display: none;">로그아웃</button>
     </div>
 
     <!-- 경고 배너 -->
@@ -1809,16 +1811,31 @@
         async function checkAuthAndPatient() {
             try {
                 currentUser = await auth.getCurrentUser();
+
+                const loginBtn = document.getElementById('loginBtn');
+                const logoutBtn = document.getElementById('logoutBtn');
+                const backBtn = document.getElementById('backToDashboardBtn');
+
                 if (!currentUser) {
                     // 로그인 필요
                     document.getElementById('noPatientWarning').style.display = 'block';
                     document.getElementById('noPatientWarning').innerHTML = `
                         <p style="font-size: 14px; color: var(--warning);">로그인이 필요합니다</p>
-                        <button onclick="window.location.href='login.html'" style="margin-top: 12px; padding: 10px 24px; font-size: 14px; background: linear-gradient(135deg, var(--warning), #D97706); border: none; border-radius: 10px; color: white; cursor: pointer;">로그인하기</button>
                     `;
                     document.getElementById('startBtn').disabled = true;
+                    document.getElementById('selectedPatientInfo').style.display = 'none';
+
+                    // 로그인 버튼 표시, 로그아웃/대시보드 버튼 숨김
+                    loginBtn.style.display = 'inline-block';
+                    logoutBtn.style.display = 'none';
+                    backBtn.style.display = 'none';
                     return false;
                 }
+
+                // 로그인된 상태: 로그아웃/대시보드 버튼 표시, 로그인 버튼 숨김
+                loginBtn.style.display = 'none';
+                logoutBtn.style.display = 'inline-block';
+                backBtn.style.display = 'inline-block';
 
                 // 선택된 환자 확인
                 const patientData = sessionStorage.getItem('selectedPatient');
@@ -2068,6 +2085,18 @@
         // 대시보드로 돌아가기 버튼
         document.getElementById('backToDashboardBtn')?.addEventListener('click', () => {
             window.location.href = 'dashboard.html';
+        });
+
+        // 로그인 버튼
+        document.getElementById('loginBtn')?.addEventListener('click', () => {
+            window.location.href = 'login.html';
+        });
+
+        // 로그아웃 버튼
+        document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+            await auth.signOut();
+            sessionStorage.removeItem('selectedPatient');
+            checkAuthAndPatient();
         });
 
         // 페이지 로드 시 인증 및 환자 선택 확인
