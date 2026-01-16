@@ -2117,7 +2117,11 @@
 
         // 대시보드로 돌아가기 버튼
         document.getElementById('backToDashboardBtn')?.addEventListener('click', () => {
-            window.location.href = 'dashboard.html';
+            if (currentUser?.profile?.role === 'admin') {
+                window.location.href = 'admin.html';
+            } else {
+                window.location.href = 'dashboard.html';
+            }
         });
 
         // 로그인 버튼

@@ -428,6 +428,7 @@
             <span class="admin-badge">관리자</span>
         </div>
         <div class="header-right">
+            <button class="btn btn-primary" id="measureBtn" style="padding: 8px 16px; font-size: 13px;">측정하기</button>
             <button class="btn-logout" id="logoutBtn">로그아웃</button>
         </div>
     </header>
@@ -534,6 +535,18 @@
             </div>
         </div>
     </main>
+
+    <!-- Patient Selection Modal -->
+    <div id="patientModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: var(--bg-dark); border-radius: 20px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="font-size: 18px;">측정할 환자 선택</h3>
+                <button onclick="closePatientModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <input type="text" id="patientModalSearch" placeholder="환자 검색..." style="width: 100%; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 14px; margin-bottom: 16px;">
+            <div id="patientModalList" style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
@@ -1022,6 +1035,75 @@
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             await auth.signOut();
             window.location.href = 'login.html';
+        });
+
+        // Measurement button - open patient selection modal
+        document.getElementById('measureBtn').addEventListener('click', () => {
+            openPatientModal();
+        });
+
+        // Open patient modal
+        function openPatientModal() {
+            const modal = document.getElementById('patientModal');
+            modal.style.display = 'flex';
+            renderPatientModal();
+        }
+
+        // Close patient modal
+        function closePatientModal() {
+            document.getElementById('patientModal').style.display = 'none';
+        }
+
+        // Render patient modal list
+        function renderPatientModal(searchTerm = '') {
+            let filtered = patientsList;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = patientsList.filter(p =>
+                    p.name?.toLowerCase().includes(term) ||
+                    p.phone?.includes(term)
+                );
+            }
+
+            if (filtered.length === 0) {
+                document.getElementById('patientModalList').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <p>환자가 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('patientModalList').innerHTML = filtered.map(p => `
+                <div onclick="selectPatientForMeasure('${p.id}', '${p.name}')" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; cursor: pointer; border: 1px solid var(--border); margin-bottom: 8px; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='transparent'">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, var(--warning), var(--danger)); display: flex; align-items: center; justify-content: center; font-weight: 600;">${getInitials(p.name)}</div>
+                    <div>
+                        <div style="font-weight: 500;">${p.name}</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">${p.users?.name || '담당 치료사 없음'} · ${p.phone || '연락처 없음'}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Search in patient modal
+        document.getElementById('patientModalSearch')?.addEventListener('input', (e) => {
+            renderPatientModal(e.target.value);
+        });
+
+        // Select patient and go to measurement
+        function selectPatientForMeasure(patientId, patientName) {
+            const patient = patientsList.find(p => p.id === patientId);
+            if (patient) {
+                sessionStorage.setItem('selectedPatient', JSON.stringify(patient));
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Close modal on background click
+        document.getElementById('patientModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'patientModal') {
+                closePatientModal();
+            }
         });
 
         // Initialize
