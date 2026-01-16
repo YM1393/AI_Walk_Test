@@ -4,15 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>설치 가이드 - AR 보행 측정</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #6366F1;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg-dark: #0F172A;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-glass: rgba(255, 255, 255, 0.08);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: white;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 20px;
-            line-height: 1.6;
+            padding: 24px;
+            line-height: 1.7;
         }
 
         .container {
@@ -22,19 +39,22 @@
 
         h1 {
             text-align: center;
-            font-size: 28px;
-            margin-bottom: 30px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #4CAF50;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--primary);
+            letter-spacing: -0.5px;
         }
 
         h2 {
-            color: #4CAF50;
-            font-size: 20px;
-            margin: 30px 0 15px;
+            color: var(--primary);
+            font-size: 18px;
+            font-weight: 600;
+            margin: 32px 0 16px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         h2::before {
@@ -42,101 +62,123 @@
             display: inline-block;
             width: 4px;
             height: 24px;
-            background: #4CAF50;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             border-radius: 2px;
         }
 
         h3 {
-            color: #aaa;
-            font-size: 16px;
-            margin: 20px 0 10px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            margin: 20px 0 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         p {
-            color: #ccc;
-            margin-bottom: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            font-size: 14px;
         }
 
         .card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 20px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 24px;
             margin-bottom: 20px;
+            border: 1px solid var(--border);
         }
 
         .card.warning {
-            border-left: 4px solid #ff9800;
+            border-left: 4px solid var(--warning);
         }
 
         .card.success {
-            border-left: 4px solid #4CAF50;
+            border-left: 4px solid var(--primary);
         }
 
         .card.info {
-            border-left: 4px solid #2196F3;
+            border-left: 4px solid var(--secondary);
         }
 
         ul, ol {
             margin-left: 20px;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
 
         li {
-            color: #ccc;
-            margin-bottom: 8px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 14px;
         }
 
         .spec-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
+            margin: 16px 0;
         }
 
         .spec-table th, .spec-table td {
-            padding: 12px;
+            padding: 14px;
             text-align: left;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border);
         }
 
         .spec-table th {
-            color: #4CAF50;
-            font-weight: normal;
+            color: var(--primary);
+            font-weight: 500;
             width: 40%;
+            font-size: 14px;
         }
 
         .spec-table td {
-            color: #fff;
+            color: var(--text-primary);
+            font-size: 14px;
         }
 
         .diagram {
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            padding: 20px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
             text-align: center;
-            margin: 15px 0;
-            font-family: monospace;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
             white-space: pre;
             overflow-x: auto;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
         }
 
         .btn {
             display: inline-block;
-            padding: 15px 30px;
-            background: #4CAF50;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             text-decoration: none;
-            border-radius: 30px;
-            font-size: 16px;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
             margin: 10px 5px;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
         }
 
         .btn.secondary {
-            background: #666;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            box-shadow: none;
         }
 
         .buttons {
             text-align: center;
-            margin-top: 30px;
+            margin-top: 40px;
         }
 
         .checklist {
@@ -145,52 +187,74 @@
         }
 
         .checklist li {
-            padding: 10px 15px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            margin-bottom: 8px;
+            padding: 14px 18px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            border: 1px solid var(--border);
+            font-size: 14px;
         }
 
         .checklist li::before {
-            content: '☐';
-            font-size: 18px;
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text-muted);
+            border-radius: 6px;
+            flex-shrink: 0;
         }
 
         .highlight {
-            color: #4CAF50;
-            font-weight: bold;
+            color: var(--primary);
+            font-weight: 600;
         }
 
         .badge {
             display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
             margin-left: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
-        .badge.required { background: #f44336; }
-        .badge.recommended { background: #ff9800; }
-        .badge.optional { background: #2196F3; }
+        .badge.required { background: linear-gradient(135deg, var(--danger), #DC2626); }
+        .badge.recommended { background: linear-gradient(135deg, var(--warning), #D97706); }
+        .badge.optional { background: linear-gradient(135deg, var(--secondary), #4F46E5); }
 
         .company-logo {
             position: fixed;
-            top: 15px;
-            left: 15px;
-            width: 50px;
+            top: 20px;
+            left: 20px;
+            width: 48px;
             height: auto;
-            border-radius: 6px;
+            border-radius: 10px;
             z-index: 100;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 3px;
         }
     </style>
 </head>
 <body>
     <img src="logo.jpeg" alt="THYM" class="company-logo">
     <div class="container">
-        <h1>📋 AR 보행 측정 설치 가이드</h1>
+        <h1>AR 보행 측정 설치 가이드</h1>
 
         <h2>1. 장비 준비</h2>
 

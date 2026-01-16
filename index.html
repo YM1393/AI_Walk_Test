@@ -4,13 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 보행 측정 - 임상 보조 소프트웨어</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #6366F1;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg-dark: #0F172A;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-glass: rgba(255, 255, 255, 0.08);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --border: rgba(255, 255, 255, 0.1);
+            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
             overflow: hidden;
-            background: #000;
+            background: var(--bg-dark);
+            color: var(--text-primary);
         }
 
         #videoContainer {
@@ -36,86 +55,110 @@
             position: absolute;
             left: 0;
             right: 0;
-            height: 4px;
+            height: 3px;
             pointer-events: none;
             z-index: 10;
+            transition: all 0.3s ease;
         }
 
         #gate2mLine {
-            background: #4CAF50;
-            box-shadow: 0 0 10px #4CAF50;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            box-shadow: 0 0 20px var(--primary), 0 0 40px rgba(16, 185, 129, 0.3);
         }
 
         #gate12mLine {
-            background: #f44336;
-            box-shadow: 0 0 10px #f44336;
+            background: linear-gradient(90deg, transparent, var(--danger), transparent);
+            box-shadow: 0 0 20px var(--danger), 0 0 40px rgba(239, 68, 68, 0.3);
         }
 
         .gate-label {
             position: absolute;
-            right: 10px;
+            right: 15px;
             transform: translateY(-50%);
-            padding: 5px 15px;
-            border-radius: 15px;
-            font-size: 14px;
-            font-weight: bold;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
             color: white;
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(10px);
         }
 
         #gate2mLine .gate-label {
-            background: #4CAF50;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
         }
 
         #gate12mLine .gate-label {
-            background: #f44336;
+            background: linear-gradient(135deg, var(--danger), #DC2626);
         }
 
         /* 오버레이 */
         #overlay {
             position: fixed;
             top: 0; left: 0; right: 0;
-            padding: 15px;
-            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.8));
+            backdrop-filter: blur(20px);
             color: white;
             text-align: center;
             z-index: 100;
+            border-bottom: 1px solid var(--border);
         }
 
-        #status { font-size: 18px; margin-bottom: 5px; }
-        #info { font-size: 14px; color: #aaa; margin-bottom: 10px; }
+        #status {
+            font-size: 17px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        #info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
 
         #timerDisplay {
-            font-size: 48px;
-            font-weight: bold;
-            color: #4CAF50;
-            font-family: 'Courier New', monospace;
+            font-size: 52px;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Inter', monospace;
+            letter-spacing: -2px;
+            font-variant-numeric: tabular-nums;
         }
 
         #timerDisplay.running {
-            color: #ff9800;
-            animation: pulse 1s infinite;
+            color: var(--warning);
+            animation: pulse 1s ease-in-out infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.02); }
         }
 
         #splitTimes {
-            margin-top: 10px;
-            font-size: 14px;
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
         }
 
         .split-time {
             display: inline-block;
-            padding: 5px 10px;
-            margin: 2px;
-            border-radius: 15px;
-            background: rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
         }
 
         .split-time.recorded {
-            background: #4CAF50;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-color: var(--primary);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
         }
 
         /* 시작 화면 */
@@ -126,162 +169,233 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
             color: white;
             z-index: 200;
         }
 
+        #startScreen::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at 30% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 80%, rgba(99, 102, 241, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
         #startScreen h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            position: relative;
         }
 
         #startScreen p {
-            margin-bottom: 10px;
-            color: #aaa;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
             text-align: center;
             padding: 0 20px;
-        }
-
-        #startScreen .icon {
-            font-size: 50px;
-            margin-bottom: 20px;
+            font-size: 14px;
         }
 
         .company-logo {
             position: fixed;
-            top: 15px;
-            left: 15px;
-            width: 50px;
+            top: 20px;
+            left: 20px;
+            width: 48px;
             height: auto;
-            border-radius: 6px;
+            border-radius: 10px;
             z-index: 500;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
         button {
-            padding: 15px 40px;
-            font-size: 18px;
+            padding: 14px 36px;
+            font-size: 16px;
+            font-weight: 600;
             border: none;
-            border-radius: 30px;
-            background: #4CAF50;
+            border-radius: 25px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             cursor: pointer;
             margin-top: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            letter-spacing: 0.3px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
         }
 
         button:disabled {
-            background: #666;
+            background: var(--text-muted);
             opacity: 0.5;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* 테스트 모드 선택 */
+        #testModeSelector {
+            display: flex;
+            gap: 12px;
+            margin: 24px 0;
+            padding: 6px;
+            background: var(--bg-glass);
+            border-radius: 28px;
+            border: 1px solid var(--border);
         }
 
         .mode-btn {
-            border: 2px solid transparent;
-            transition: all 0.3s;
+            padding: 12px 24px !important;
+            margin: 0 !important;
+            border-radius: 22px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            background: transparent !important;
+            color: var(--text-secondary) !important;
+            border: none !important;
+            box-shadow: none !important;
+            transition: all 0.3s ease !important;
+        }
+
+        .mode-btn:hover {
+            color: var(--text-primary) !important;
+            background: var(--bg-glass) !important;
+            transform: none !important;
         }
 
         .mode-btn.active {
-            background: #4CAF50 !important;
-            border-color: #fff;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+            color: white !important;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
         }
 
         /* 하단 버튼 */
         #buttons {
             position: fixed;
-            bottom: 30px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 100;
             display: none;
-            gap: 10px;
+            gap: 12px;
         }
 
-        #resetBtn { background: #ff9800; }
-        #exitBtn { background: #f44336; }
+        #resetBtn {
+            background: linear-gradient(135deg, var(--warning), #D97706);
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
+
+        #exitBtn {
+            background: linear-gradient(135deg, var(--danger), #DC2626);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
 
         /* 게이트 조절 */
         #gateControls {
             position: fixed;
-            right: 10px;
+            right: 15px;
             top: 50%;
             transform: translateY(-50%);
             z-index: 100;
             display: none;
             flex-direction: column;
-            gap: 20px;
+            gap: 16px;
         }
 
         .gate-slider {
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 10px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            padding: 12px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
         }
 
         .gate-slider label {
-            color: white;
-            font-size: 12px;
-            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .gate-slider input[type="range"] {
             writing-mode: vertical-lr;
             direction: rtl;
             height: 100px;
-            width: 30px;
+            width: 28px;
+            accent-color: var(--primary);
         }
 
         /* 감지 상태 표시 */
         #detectionStatus {
             position: fixed;
-            bottom: 100px;
+            bottom: 110px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 100;
             display: none;
-            background: rgba(0,0,0,0.8);
-            padding: 10px 20px;
-            border-radius: 20px;
-            color: white;
-            font-size: 14px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            padding: 10px 24px;
+            border-radius: 25px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
         }
 
         #detectionStatus.detected {
-            background: #4CAF50;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-color: var(--primary);
         }
 
         #detectionStatus.warning {
-            background: #ff9800;
-            animation: blink 0.5s infinite;
+            background: linear-gradient(135deg, var(--warning), #D97706);
+            color: white;
+            border-color: var(--warning);
+            animation: blink 0.5s ease-in-out infinite;
         }
 
         @keyframes blink {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.6; }
         }
 
         /* 게이트 라인 상태 */
         .gate-line.inactive {
-            opacity: 0.2;
+            opacity: 0.25;
             height: 2px;
             box-shadow: none;
         }
 
         .gate-line.active {
             opacity: 1;
-            height: 6px;
-            animation: glow 1s infinite;
+            height: 5px;
+            animation: glow 1.5s ease-in-out infinite;
         }
 
         @keyframes glow {
-            0%, 100% { box-shadow: 0 0 10px currentColor; }
-            50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
         }
 
         .gate-line.passed {
             opacity: 0.3;
-            background: #888 !important;
+            background: var(--text-muted) !important;
             box-shadow: none;
         }
 
@@ -291,84 +405,100 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(255, 152, 0, 0.95);
+            background: linear-gradient(135deg, var(--warning), #D97706);
             color: white;
-            padding: 20px 40px;
-            border-radius: 15px;
-            font-size: 18px;
-            font-weight: bold;
+            padding: 24px 48px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 600;
             z-index: 150;
             display: none;
             text-align: center;
+            box-shadow: 0 20px 40px rgba(245, 158, 11, 0.3);
+            backdrop-filter: blur(10px);
         }
 
         /* 테스트 리포트 */
         #reportScreen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.98);
+            background: linear-gradient(160deg, #0F172A 0%, #1E293B 100%);
             color: white;
             z-index: 350;
             display: none;
             flex-direction: column;
             overflow-y: auto;
-            padding: 20px;
+            padding: 24px;
         }
 
         #reportScreen h2 {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            font-size: 22px;
+            font-weight: 700;
         }
 
         .stats-card {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 15px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
         }
 
         .stats-card h3 {
-            font-size: 14px;
-            color: #aaa;
-            margin-bottom: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            gap: 16px;
         }
 
         .stat-item {
             text-align: center;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: 12px;
         }
 
         .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #4CAF50;
-            font-family: 'Courier New', monospace;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
         }
 
         .stat-label {
-            font-size: 12px;
-            color: #888;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .history-list {
             max-height: 200px;
             overflow-y: auto;
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            padding: 10px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 8px;
         }
 
         .history-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px;
-            border-bottom: 1px solid #333;
-            font-family: 'Courier New', monospace;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
         }
 
         .history-item:last-child {
@@ -377,67 +507,88 @@
 
         .report-buttons {
             display: flex;
-            gap: 10px;
-            margin-top: 20px;
+            gap: 12px;
+            margin-top: 24px;
             flex-wrap: wrap;
             justify-content: center;
         }
 
         .report-buttons button {
-            padding: 12px 25px;
+            padding: 12px 24px;
             font-size: 14px;
         }
 
-        #exportBtn { background: #2196F3; }
-        #clearBtn { background: #f44336; }
-        #closeReportBtn { background: #666; }
+        #exportBtn {
+            background: linear-gradient(135deg, var(--secondary), #4F46E5);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        #clearBtn {
+            background: linear-gradient(135deg, var(--danger), #DC2626);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+
+        #closeReportBtn {
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            box-shadow: none;
+        }
 
         /* 결과 화면 */
         #resultScreen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.95);
+            background: linear-gradient(160deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+            backdrop-filter: blur(20px);
             color: white;
             z-index: 300;
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
         }
 
         #resultScreen h2 {
-            font-size: 28px;
-            margin-bottom: 30px;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 32px;
         }
 
         .result-table {
             width: 100%;
-            max-width: 350px;
+            max-width: 360px;
             border-collapse: collapse;
-            margin-bottom: 30px;
+            margin-bottom: 32px;
+            background: var(--bg-glass);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border);
         }
 
         .result-table th, .result-table td {
-            padding: 15px;
+            padding: 18px;
             text-align: center;
-            border-bottom: 1px solid #444;
         }
 
         .result-table th {
-            color: #aaa;
-            font-weight: normal;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 13px;
+            background: var(--bg-card);
         }
 
         .result-table td {
-            font-size: 20px;
-            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            border-top: 1px solid var(--border);
         }
 
         .result-table .total {
             font-size: 28px;
-            color: #4CAF50;
-            font-weight: bold;
+            color: var(--primary);
+            font-weight: 700;
         }
 
         .hidden { display: none !important; }
@@ -446,7 +597,8 @@
         #loading {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.9);
+            background: linear-gradient(160deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));
+            backdrop-filter: blur(20px);
             color: white;
             z-index: 400;
             display: none;
@@ -456,17 +608,34 @@
         }
 
         .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #333;
-            border-top-color: #4CAF50;
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 24px;
+        }
+
+        #loading p {
+            font-size: 14px;
+            color: var(--text-secondary);
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        /* 스크롤바 스타일 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 3px;
         }
     </style>
 </head>
@@ -480,19 +649,19 @@
         <p>물리치료 임상 보조 소프트웨어</p>
 
         <!-- 테스트 모드 선택 -->
-        <div id="testModeSelector" style="margin: 20px 0;">
-            <p style="font-size: 14px; margin-bottom: 10px;">테스트 모드 선택</p>
-            <button id="mode10MWT" class="mode-btn active" style="padding: 12px 20px; margin: 5px; border-radius: 20px;">10M WT</button>
-            <button id="modeTUG" class="mode-btn" style="padding: 12px 20px; margin: 5px; background: #666; border-radius: 20px;">TUG</button>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">테스트 모드</p>
+        <div id="testModeSelector">
+            <button id="mode10MWT" class="mode-btn active">10M WT</button>
+            <button id="modeTUG" class="mode-btn">TUG</button>
         </div>
 
-        <p id="modeDescription" style="font-size: 12px;">AR로 바닥에 2m, 12m 라인을<br>자동 배치하고 통과를 감지합니다</p>
-        <button id="startBtn">측정 시작</button>
-        <button id="guideBtn" style="background: #2196F3; margin-top: 20px; padding: 10px 30px; font-size: 14px;">📋 설치 가이드</button>
+        <p id="modeDescription" style="font-size: 13px; color: var(--text-secondary); max-width: 280px; line-height: 1.6;">AR로 바닥에 2m, 12m 라인을<br>자동 배치하고 통과를 감지합니다</p>
+        <button id="startBtn" style="margin-top: 24px; padding: 16px 48px; font-size: 17px;">측정 시작</button>
+        <button id="guideBtn" style="background: linear-gradient(135deg, var(--secondary), #4F46E5); margin-top: 16px; padding: 12px 32px; font-size: 14px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);">설치 가이드</button>
     </div>
 
     <!-- 경고 배너 -->
-    <div id="warningBanner">⚠️ 추적 끊김 - 환자를 다시 비춰주세요</div>
+    <div id="warningBanner">추적 끊김 - 환자를 다시 비춰주세요</div>
 
     <!-- 로딩 화면 -->
     <div id="loading">
@@ -563,15 +732,19 @@
                 <td class="total" id="resultTotal">--</td>
             </tr>
         </table>
-        <button id="retryBtn">다시 측정</button>
-        <button id="saveResultBtn" style="background: #2196F3;">결과 저장</button>
-        <button id="viewReportBtn" style="background: #9C27B0;">리포트 보기</button>
-        <button id="closeResultBtn" style="background: #666;">닫기</button>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;">
+            <button id="retryBtn">다시 측정</button>
+            <button id="saveResultBtn" style="background: linear-gradient(135deg, var(--secondary), #4F46E5); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);">결과 저장</button>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 12px;">
+            <button id="viewReportBtn" style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);">리포트 보기</button>
+            <button id="closeResultBtn" style="background: var(--bg-glass); border: 1px solid var(--border); box-shadow: none;">닫기</button>
+        </div>
     </div>
 
     <!-- 테스트 리포트 화면 -->
     <div id="reportScreen">
-        <h2>📊 테스트 리포트</h2>
+        <h2>테스트 리포트</h2>
 
         <div class="stats-card">
             <h3>통계 요약 (2m → 12m 구간)</h3>
