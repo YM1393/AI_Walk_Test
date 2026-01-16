@@ -640,11 +640,18 @@
     </style>
 </head>
 <body>
-    <!-- 회사 로고 (항상 표시) -->
-    <img src="logo.jpeg" alt="THYM" class="company-logo">
+    <!-- 상단 헤더 바 -->
+    <div id="headerBar" style="position: fixed; top: 0; left: 0; right: 0; height: 60px; background: var(--bg-glass); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 500;">
+        <img src="logo.jpeg" alt="THYM" style="width: 40px; height: auto; border-radius: 8px;">
+        <div id="authButtons" style="display: flex; gap: 10px; align-items: center;">
+            <span id="userNameDisplay" style="font-size: 13px; color: var(--text-secondary); display: none;"></span>
+            <button id="loginBtn" style="padding: 8px 20px; font-size: 13px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border: none; border-radius: 8px; color: white; cursor: pointer;">로그인</button>
+            <button id="logoutBtn" style="padding: 8px 20px; font-size: 13px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); cursor: pointer; display: none;">로그아웃</button>
+        </div>
+    </div>
 
     <!-- 시작 화면 -->
-    <div id="startScreen">
+    <div id="startScreen" style="padding-top: 80px;">
         <h1>AI 보행 측정</h1>
         <p>물리치료 임상 보조 소프트웨어</p>
 
@@ -671,8 +678,6 @@
         <button id="startBtn" style="margin-top: 24px; padding: 16px 48px; font-size: 17px;">측정 시작</button>
         <button id="guideBtn" style="background: linear-gradient(135deg, var(--secondary), #4F46E5); margin-top: 16px; padding: 12px 32px; font-size: 14px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);">설치 가이드</button>
         <button id="backToDashboardBtn" style="background: var(--bg-glass); border: 1px solid var(--border); margin-top: 12px; padding: 10px 24px; font-size: 13px; box-shadow: none; display: none;">대시보드로 돌아가기</button>
-        <button id="loginBtn" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); margin-top: 12px; padding: 12px 32px; font-size: 14px;">로그인</button>
-        <button id="logoutBtn" style="background: var(--bg-glass); border: 1px solid var(--danger); color: var(--danger); margin-top: 8px; padding: 10px 24px; font-size: 13px; box-shadow: none; display: none;">로그아웃</button>
     </div>
 
     <!-- 경고 배너 -->
@@ -1816,6 +1821,8 @@
                 const logoutBtn = document.getElementById('logoutBtn');
                 const backBtn = document.getElementById('backToDashboardBtn');
 
+                const userNameDisplay = document.getElementById('userNameDisplay');
+
                 if (!currentUser) {
                     // 로그인 필요
                     document.getElementById('noPatientWarning').style.display = 'block';
@@ -1826,16 +1833,21 @@
                     document.getElementById('selectedPatientInfo').style.display = 'none';
 
                     // 로그인 버튼 표시, 로그아웃/대시보드 버튼 숨김
-                    loginBtn.style.display = 'inline-block';
-                    logoutBtn.style.display = 'none';
-                    backBtn.style.display = 'none';
+                    if (loginBtn) loginBtn.style.display = 'inline-block';
+                    if (logoutBtn) logoutBtn.style.display = 'none';
+                    if (backBtn) backBtn.style.display = 'none';
+                    if (userNameDisplay) userNameDisplay.style.display = 'none';
                     return false;
                 }
 
                 // 로그인된 상태: 로그아웃/대시보드 버튼 표시, 로그인 버튼 숨김
-                loginBtn.style.display = 'none';
-                logoutBtn.style.display = 'inline-block';
-                backBtn.style.display = 'inline-block';
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (logoutBtn) logoutBtn.style.display = 'inline-block';
+                if (backBtn) backBtn.style.display = 'inline-block';
+                if (userNameDisplay) {
+                    userNameDisplay.style.display = 'inline-block';
+                    userNameDisplay.textContent = currentUser.profile?.name || currentUser.email;
+                }
 
                 // 선택된 환자 확인
                 const patientData = sessionStorage.getItem('selectedPatient');
@@ -1858,9 +1870,11 @@
                 const loginBtn = document.getElementById('loginBtn');
                 const logoutBtn = document.getElementById('logoutBtn');
                 const backBtn = document.getElementById('backToDashboardBtn');
+                const userNameDisplay = document.getElementById('userNameDisplay');
                 if (loginBtn) loginBtn.style.display = 'inline-block';
                 if (logoutBtn) logoutBtn.style.display = 'none';
                 if (backBtn) backBtn.style.display = 'none';
+                if (userNameDisplay) userNameDisplay.style.display = 'none';
                 return false;
             }
         }
