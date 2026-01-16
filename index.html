@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 보행 측정 - 임상 보조 소프트웨어</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #videoContainer {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 게이트 라인 */
+        .gate-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #gate2mLine {
+            background: #4CAF50;
+            box-shadow: 0 0 10px #4CAF50;
+        }
+
+        #gate12mLine {
+            background: #f44336;
+            box-shadow: 0 0 10px #f44336;
+        }
+
+        .gate-label {
+            position: absolute;
+            right: 10px;
+            transform: translateY(-50%);
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+        }
+
+        #gate2mLine .gate-label {
+            background: #4CAF50;
+        }
+
+        #gate12mLine .gate-label {
+            background: #f44336;
+        }
+
+        /* 오버레이 */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            text-align: center;
+            z-index: 100;
+        }
+
+        #status { font-size: 18px; margin-bottom: 5px; }
+        #info { font-size: 14px; color: #aaa; margin-bottom: 10px; }
+
+        #timerDisplay {
+            font-size: 48px;
+            font-weight: bold;
+            color: #4CAF50;
+            font-family: 'Courier New', monospace;
+        }
+
+        #timerDisplay.running {
+            color: #ff9800;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        #splitTimes {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .split-time {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 15px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .split-time.recorded {
+            background: #4CAF50;
+        }
+
+        /* 시작 화면 */
+        #startScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            z-index: 200;
+        }
+
+        #startScreen h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        #startScreen p {
+            margin-bottom: 10px;
+            color: #aaa;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        #startScreen .icon {
+            font-size: 50px;
+            margin-bottom: 20px;
+        }
+
+        .company-logo {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            width: 50px;
+            height: auto;
+            border-radius: 6px;
+            z-index: 500;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 18px;
+            border: none;
+            border-radius: 30px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:disabled {
+            background: #666;
+            opacity: 0.5;
+        }
+
+        /* 하단 버튼 */
+        #buttons {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: none;
+            gap: 10px;
+        }
+
+        #resetBtn { background: #ff9800; }
+        #exitBtn { background: #f44336; }
+
+        /* 게이트 조절 */
+        #gateControls {
+            position: fixed;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .gate-slider {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .gate-slider label {
+            color: white;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .gate-slider input[type="range"] {
+            writing-mode: vertical-lr;
+            direction: rtl;
+            height: 100px;
+            width: 30px;
+        }
+
+        /* 감지 상태 표시 */
+        #detectionStatus {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: none;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+        }
+
+        #detectionStatus.detected {
+            background: #4CAF50;
+        }
+
+        #detectionStatus.warning {
+            background: #ff9800;
+            animation: blink 0.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* 게이트 라인 상태 */
+        .gate-line.inactive {
+            opacity: 0.2;
+            height: 2px;
+            box-shadow: none;
+        }
+
+        .gate-line.active {
+            opacity: 1;
+            height: 6px;
+            animation: glow 1s infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px currentColor; }
+            50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+        }
+
+        .gate-line.passed {
+            opacity: 0.3;
+            background: #888 !important;
+            box-shadow: none;
+        }
+
+        /* 경고 배너 */
+        #warningBanner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 152, 0, 0.95);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 150;
+            display: none;
+            text-align: center;
+        }
+
+        /* 테스트 리포트 */
+        #reportScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.98);
+            color: white;
+            z-index: 350;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        #reportScreen h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .stats-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stats-card h3 {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            font-family: 'Courier New', monospace;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .report-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .report-buttons button {
+            padding: 12px 25px;
+            font-size: 14px;
+        }
+
+        #exportBtn { background: #2196F3; }
+        #clearBtn { background: #f44336; }
+        #closeReportBtn { background: #666; }
+
+        /* 결과 화면 */
+        #resultScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.95);
+            color: white;
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #resultScreen h2 {
+            font-size: 28px;
+            margin-bottom: 30px;
+        }
+
+        .result-table {
+            width: 100%;
+            max-width: 350px;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .result-table th, .result-table td {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #444;
+        }
+
+        .result-table th {
+            color: #aaa;
+            font-weight: normal;
+        }
+
+        .result-table td {
+            font-size: 20px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .result-table .total {
+            font-size: 28px;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .hidden { display: none !important; }
+
+        /* 로딩 */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            z-index: 400;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 회사 로고 (항상 표시) -->
+    <img src="logo.jpeg" alt="THYM" class="company-logo">
+
+    <!-- 시작 화면 -->
+    <div id="startScreen">
+        <div class="icon">🤖</div>
+        <h1>AI 보행 측정</h1>
+        <p>물리치료 임상 보조 소프트웨어</p>
+        <p style="font-size: 12px;">카메라로 환자를 촬영하면<br>2m, 12m 통과를 자동 감지합니다</p>
+        <button id="startBtn">측정 시작</button>
+        <button id="guideBtn" style="background: #2196F3; margin-top: 20px; padding: 10px 30px; font-size: 14px;">📋 설치 가이드</button>
+    </div>
+
+    <!-- 경고 배너 -->
+    <div id="warningBanner">⚠️ 추적 끊김 - 환자를 다시 비춰주세요</div>
+
+    <!-- 로딩 화면 -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>AI 모델 로딩 중...</p>
+    </div>
+
+    <!-- 비디오 컨테이너 -->
+    <div id="videoContainer" class="hidden">
+        <video id="webcam" playsinline></video>
+        <canvas id="canvas"></canvas>
+
+        <!-- 게이트 라인 -->
+        <div id="gate2mLine" class="gate-line" style="top: 40%;">
+            <span class="gate-label">2m 시작</span>
+        </div>
+        <div id="gate12mLine" class="gate-line" style="top: 70%;">
+            <span class="gate-label">12m 종료</span>
+        </div>
+    </div>
+
+    <!-- 오버레이 -->
+    <div id="overlay" class="hidden">
+        <div id="status">대기 중...</div>
+        <div id="info">환자가 2m 라인을 통과하면 자동 시작</div>
+        <div id="timerDisplay">00:00.00</div>
+        <div id="splitTimes">
+            <span class="split-time" id="split2m">2m: 대기</span>
+            <span class="split-time" id="split12m">12m: 대기</span>
+        </div>
+    </div>
+
+    <!-- 게이트 위치 조절 -->
+    <div id="gateControls">
+        <div class="gate-slider">
+            <label>2m</label>
+            <input type="range" id="gate2mSlider" min="10" max="50" value="40">
+        </div>
+        <div class="gate-slider">
+            <label>12m</label>
+            <input type="range" id="gate12mSlider" min="50" max="90" value="70">
+        </div>
+    </div>
+
+    <!-- 감지 상태 -->
+    <div id="detectionStatus">사람 감지 중...</div>
+
+    <!-- 하단 버튼 -->
+    <div id="buttons">
+        <button id="resetBtn">초기화</button>
+        <button id="exitBtn">종료</button>
+    </div>
+
+    <!-- 결과 화면 -->
+    <div id="resultScreen">
+        <h2>측정 결과</h2>
+        <table class="result-table">
+            <tr>
+                <th>구간</th>
+                <th>시간</th>
+            </tr>
+            <tr>
+                <td>2m → 12m</td>
+                <td id="result2to12">--</td>
+            </tr>
+            <tr>
+                <td><strong>총 시간</strong></td>
+                <td class="total" id="resultTotal">--</td>
+            </tr>
+        </table>
+        <button id="retryBtn">다시 측정</button>
+        <button id="saveResultBtn" style="background: #2196F3;">결과 저장</button>
+        <button id="viewReportBtn" style="background: #9C27B0;">리포트 보기</button>
+        <button id="closeResultBtn" style="background: #666;">닫기</button>
+    </div>
+
+    <!-- 테스트 리포트 화면 -->
+    <div id="reportScreen">
+        <h2>📊 테스트 리포트</h2>
+
+        <div class="stats-card">
+            <h3>통계 요약 (2m → 12m 구간)</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="statCount">0</div>
+                    <div class="stat-label">측정 횟수</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statMean">--</div>
+                    <div class="stat-label">평균</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statStd">--</div>
+                    <div class="stat-label">표준편차</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statCV">--</div>
+                    <div class="stat-label">CV%</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statMin">--</div>
+                    <div class="stat-label">최소</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statMax">--</div>
+                    <div class="stat-label">최대</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <h3>측정 기록</h3>
+            <div class="history-list" id="historyList">
+                <p style="color: #888; text-align: center;">저장된 기록이 없습니다</p>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <h3>테스트 정보</h3>
+            <div style="font-size: 14px; color: #aaa;">
+                <p>기기: <span id="deviceInfo">--</span></p>
+                <p>브라우저: <span id="browserInfo">--</span></p>
+                <p>테스트 날짜: <span id="testDate">--</span></p>
+            </div>
+        </div>
+
+        <div class="report-buttons">
+            <button id="exportBtn">CSV 내보내기</button>
+            <button id="clearBtn">기록 삭제</button>
+            <button id="closeReportBtn">닫기</button>
+        </div>
+    </div>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+    <script>
+        // DOM 요소
+        const startScreen = document.getElementById('startScreen');
+        const startBtn = document.getElementById('startBtn');
+        const loading = document.getElementById('loading');
+        const videoContainer = document.getElementById('videoContainer');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const statusEl = document.getElementById('status');
+        const infoEl = document.getElementById('info');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const splitTimes = document.getElementById('splitTimes');
+        const split2m = document.getElementById('split2m');
+        const split12m = document.getElementById('split12m');
+        const buttons = document.getElementById('buttons');
+        const resetBtn = document.getElementById('resetBtn');
+        const exitBtn = document.getElementById('exitBtn');
+        const gateControls = document.getElementById('gateControls');
+        const gate2mSlider = document.getElementById('gate2mSlider');
+        const gate12mSlider = document.getElementById('gate12mSlider');
+        const gate2mLine = document.getElementById('gate2mLine');
+        const gate12mLine = document.getElementById('gate12mLine');
+        const detectionStatus = document.getElementById('detectionStatus');
+        const resultScreen = document.getElementById('resultScreen');
+        const result2to12 = document.getElementById('result2to12');
+        const resultTotal = document.getElementById('resultTotal');
+        const retryBtn = document.getElementById('retryBtn');
+        const closeResultBtn = document.getElementById('closeResultBtn');
+
+        // MediaPipe Pose
+        let pose = null;
+        let camera = null;
+
+        // 상태 변수
+        const MeasureState = {
+            WAITING: 0,      // 2m 통과 대기
+            MEASURING: 1,    // 측정 중 (2m 통과 후)
+            COMPLETE: 2      // 12m 통과 완료
+        };
+        let measureState = MeasureState.WAITING;
+
+        // 타이머 변수
+        let timerRunning = false;
+        let timerStartTime = 0;
+        let timerAnimationId = null;
+        let gateTimes = { '2m': null, '12m': null };
+
+        // 게이트 위치 (화면 비율, 0-100%)
+        let gate2mPosition = 40;
+        let gate12mPosition = 70;
+
+        // 히스테리시스 (연속 프레임 체크)
+        const HYSTERESIS_FRAMES = 3;
+        let gate2mFrameCount = 0;
+        let gate12mFrameCount = 0;
+        let lastFootY = null;
+
+        // 추적 끊김 복구
+        const TRACKING_TIMEOUT = 2000;  // 2초 타임아웃
+        let lastDetectedTime = 0;
+        let trackingLost = false;
+        let warningBanner = null;
+
+        // 신뢰도 추적
+        let detectionConfidence = 0;
+        const MIN_CONFIDENCE = 0.3;
+
+        // 프레임 처리 루프
+        let isProcessing = false;
+        let animationId = null;
+
+        async function processFrame() {
+            if (!isProcessing) return;
+
+            if (video.readyState >= 2 && pose) {
+                try {
+                    await pose.send({ image: video });
+                } catch (e) {
+                    console.log('Pose send error:', e);
+                }
+            }
+
+            animationId = requestAnimationFrame(processFrame);
+        }
+
+        // MediaPipe 초기화
+        async function initPose() {
+            loading.style.display = 'flex';
+
+            try {
+                // 1. 먼저 카메라 시작
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = stream;
+
+                // 비디오 메타데이터 로드 대기
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        resolve();
+                    };
+                });
+
+                await video.play();
+
+                // 캔버스 크기 설정
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+
+                // 2. MediaPipe Pose 초기화
+                pose = new Pose({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                    }
+                });
+
+                pose.setOptions({
+                    modelComplexity: 0,  // 0 = lite (더 빠름)
+                    smoothLandmarks: true,
+                    enableSegmentation: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                pose.onResults(onPoseResults);
+
+                // 3. 프레임 처리 시작
+                isProcessing = true;
+                processFrame();
+
+                loading.style.display = 'none';
+                startScreen.classList.add('hidden');
+                videoContainer.classList.remove('hidden');
+                overlay.classList.remove('hidden');
+                buttons.style.display = 'flex';
+                gateControls.style.display = 'flex';
+                detectionStatus.style.display = 'block';
+
+                // 초기 게이트 상태 설정
+                lastDetectedTime = performance.now();
+                gate2mLine.classList.add('active');
+                gate12mLine.classList.add('inactive');
+
+            } catch (error) {
+                loading.style.display = 'none';
+                alert('초기화 실패: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        // Pose 결과 처리
+        function onPoseResults(results) {
+            // 캔버스 초기화
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const currentTime = performance.now();
+
+            if (results.poseLandmarks) {
+                // 포즈 그리기
+                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
+                    color: '#00FF00',
+                    lineWidth: 2
+                });
+                drawLandmarks(ctx, results.poseLandmarks, {
+                    color: '#FF0000',
+                    lineWidth: 1,
+                    radius: 3
+                });
+
+                // 발 위치 추출 (왼발, 오른발 중 더 낮은 위치)
+                const leftAnkle = results.poseLandmarks[27];  // LEFT_ANKLE
+                const rightAnkle = results.poseLandmarks[28]; // RIGHT_ANKLE
+                const leftHeel = results.poseLandmarks[29];   // LEFT_HEEL
+                const rightHeel = results.poseLandmarks[30];  // RIGHT_HEEL
+
+                // 신뢰도 체크 (visibility)
+                const avgVisibility = (
+                    (leftAnkle?.visibility || 0) +
+                    (rightAnkle?.visibility || 0) +
+                    (leftHeel?.visibility || 0) +
+                    (rightHeel?.visibility || 0)
+                ) / 4;
+
+                detectionConfidence = avgVisibility;
+
+                // 가장 낮은 점 (화면에서 가장 아래 = y값이 큰 점)
+                let footY = Math.max(
+                    leftAnkle?.y || 0,
+                    rightAnkle?.y || 0,
+                    leftHeel?.y || 0,
+                    rightHeel?.y || 0
+                ) * 100; // 0-100% 스케일로 변환
+
+                if (footY > 0 && avgVisibility >= MIN_CONFIDENCE) {
+                    lastFootY = footY;
+                    lastDetectedTime = currentTime;
+
+                    // 추적 복구
+                    if (trackingLost) {
+                        trackingLost = false;
+                        hideWarning();
+                    }
+
+                    // 신뢰도에 따른 상태 표시
+                    if (avgVisibility > 0.7) {
+                        detectionStatus.textContent = `발 위치: ${footY.toFixed(1)}%`;
+                        detectionStatus.classList.add('detected');
+                        detectionStatus.classList.remove('warning');
+                    } else {
+                        detectionStatus.textContent = `발 위치: ${footY.toFixed(1)}% (신뢰도 낮음)`;
+                        detectionStatus.classList.add('detected');
+                        detectionStatus.classList.add('warning');
+                    }
+
+                    // 게이트 통과 체크
+                    checkGatePass(footY);
+                } else {
+                    handleTrackingLoss(currentTime);
+                }
+            } else {
+                handleTrackingLoss(currentTime);
+            }
+
+            ctx.restore();
+        }
+
+        // 추적 끊김 처리
+        function handleTrackingLoss(currentTime) {
+            const timeSinceLast = currentTime - lastDetectedTime;
+
+            if (measureState === MeasureState.MEASURING) {
+                // 측정 중일 때 추적 끊김
+                if (timeSinceLast > TRACKING_TIMEOUT) {
+                    // 타임아웃: 경고 표시
+                    if (!trackingLost) {
+                        trackingLost = true;
+                        showWarning();
+                    }
+                    detectionStatus.textContent = `⚠️ 추적 끊김 (${(timeSinceLast/1000).toFixed(1)}초)`;
+                    detectionStatus.classList.remove('detected');
+                    detectionStatus.classList.add('warning');
+                } else {
+                    // 타임아웃 전: 마지막 위치 유지
+                    detectionStatus.textContent = `마지막 위치 유지 중...`;
+                    detectionStatus.classList.add('warning');
+                    // 히스테리시스 카운트는 유지 (급격히 리셋하지 않음)
+                }
+            } else {
+                // 대기 중일 때는 단순히 감지 중 표시
+                detectionStatus.textContent = '사람 감지 중...';
+                detectionStatus.classList.remove('detected');
+                detectionStatus.classList.remove('warning');
+                gate2mFrameCount = Math.max(0, gate2mFrameCount - 1);
+            }
+        }
+
+        // 경고 표시
+        function showWarning() {
+            if (!warningBanner) {
+                warningBanner = document.getElementById('warningBanner');
+            }
+            warningBanner.style.display = 'block';
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100, 50, 100]);
+            }
+        }
+
+        // 경고 숨김
+        function hideWarning() {
+            if (warningBanner) {
+                warningBanner.style.display = 'none';
+            }
+        }
+
+        // 게이트 통과 체크 (히스테리시스 적용)
+        function checkGatePass(footY) {
+            if (measureState === MeasureState.WAITING) {
+                // 2m 게이트 통과 체크
+                if (footY >= gate2mPosition) {
+                    gate2mFrameCount++;
+                    if (gate2mFrameCount >= HYSTERESIS_FRAMES) {
+                        // 2m 통과 확정 → 타이머 시작
+                        onGate2mPass();
+                    }
+                } else {
+                    gate2mFrameCount = Math.max(0, gate2mFrameCount - 1);
+                }
+            } else if (measureState === MeasureState.MEASURING) {
+                // 12m 게이트 통과 체크
+                if (footY >= gate12mPosition) {
+                    gate12mFrameCount++;
+                    if (gate12mFrameCount >= HYSTERESIS_FRAMES) {
+                        // 12m 통과 확정 → 타이머 종료
+                        onGate12mPass();
+                    }
+                } else {
+                    gate12mFrameCount = Math.max(0, gate12mFrameCount - 1);
+                }
+            }
+        }
+
+        // 2m 게이트 통과
+        function onGate2mPass() {
+            measureState = MeasureState.MEASURING;
+            gateTimes['2m'] = performance.now();
+            timerStartTime = gateTimes['2m'];
+            timerRunning = true;
+
+            split2m.textContent = '2m: 통과!';
+            split2m.classList.add('recorded');
+
+            // UI 단순화: 2m 라인 비활성화, 12m 라인 활성화
+            gate2mLine.classList.remove('active');
+            gate2mLine.classList.add('passed');
+            gate12mLine.classList.remove('inactive');
+            gate12mLine.classList.add('active');
+
+            statusEl.textContent = '🏃 측정 중...';
+            infoEl.textContent = '12m 라인을 향해 이동하세요';
+            timerDisplay.classList.add('running');
+
+            updateTimerDisplay();
+
+            // 진동 피드백 (지원되는 경우)
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+        }
+
+        // 12m 게이트 통과
+        function onGate12mPass() {
+            measureState = MeasureState.COMPLETE;
+            gateTimes['12m'] = performance.now();
+            timerRunning = false;
+
+            const elapsed = gateTimes['12m'] - gateTimes['2m'];
+            split12m.textContent = `12m: ${formatTime(elapsed)}`;
+            split12m.classList.add('recorded');
+
+            // UI: 12m 라인도 통과 상태로
+            gate12mLine.classList.remove('active');
+            gate12mLine.classList.add('passed');
+
+            statusEl.textContent = '✅ 측정 완료!';
+            infoEl.textContent = '';
+            timerDisplay.textContent = formatTime(elapsed);
+            timerDisplay.classList.remove('running');
+
+            // 경고 숨김
+            hideWarning();
+
+            // 진동 피드백
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            }
+
+            // 결과 표시
+            setTimeout(showResults, 1000);
+        }
+
+        // 타이머 표시 업데이트
+        function updateTimerDisplay() {
+            if (!timerRunning) return;
+
+            const elapsed = performance.now() - timerStartTime;
+            timerDisplay.textContent = formatTime(elapsed);
+
+            timerAnimationId = requestAnimationFrame(updateTimerDisplay);
+        }
+
+        // 시간 포맷
+        function formatTime(ms) {
+            const totalSeconds = ms / 1000;
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            const centiseconds = Math.floor((ms % 1000) / 10);
+
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+        }
+
+        // 결과 화면
+        function showResults() {
+            const elapsed = gateTimes['12m'] - gateTimes['2m'];
+            result2to12.textContent = formatTime(elapsed);
+            resultTotal.textContent = formatTime(elapsed);
+            resultScreen.style.display = 'flex';
+        }
+
+        // 초기화
+        function resetMeasurement() {
+            measureState = MeasureState.WAITING;
+            timerRunning = false;
+            gateTimes = { '2m': null, '12m': null };
+            gate2mFrameCount = 0;
+            gate12mFrameCount = 0;
+            trackingLost = false;
+            lastDetectedTime = performance.now();
+
+            if (timerAnimationId) {
+                cancelAnimationFrame(timerAnimationId);
+            }
+
+            timerDisplay.textContent = '00:00.00';
+            timerDisplay.classList.remove('running');
+
+            split2m.textContent = '2m: 대기';
+            split12m.textContent = '12m: 대기';
+            split2m.classList.remove('recorded');
+            split12m.classList.remove('recorded');
+
+            // UI 단순화: 초기 상태 - 2m 활성, 12m 비활성
+            gate2mLine.classList.remove('passed', 'inactive');
+            gate2mLine.classList.add('active');
+            gate12mLine.classList.remove('passed', 'active');
+            gate12mLine.classList.add('inactive');
+
+            statusEl.textContent = '대기 중...';
+            infoEl.textContent = '환자가 2m 라인을 통과하면 자동 시작';
+
+            resultScreen.style.display = 'none';
+            hideWarning();
+        }
+
+        // 종료
+        function stopCamera() {
+            isProcessing = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            pose = null;
+            startScreen.classList.remove('hidden');
+            videoContainer.classList.add('hidden');
+            overlay.classList.add('hidden');
+            buttons.style.display = 'none';
+            gateControls.style.display = 'none';
+            detectionStatus.style.display = 'none';
+        }
+
+        // 게이트 위치 업데이트
+        function updateGatePositions() {
+            gate2mPosition = parseInt(gate2mSlider.value);
+            gate12mPosition = parseInt(gate12mSlider.value);
+
+            gate2mLine.style.top = gate2mPosition + '%';
+            gate12mLine.style.top = gate12mPosition + '%';
+        }
+
+        // ===== 결과 저장 및 리포트 =====
+
+        const STORAGE_KEY = 'ar_measure_results';
+
+        // 결과 저장
+        function saveResult() {
+            const elapsed = gateTimes['12m'] - gateTimes['2m'];
+            const result = {
+                id: Date.now(),
+                time: elapsed,
+                timeFormatted: formatTime(elapsed),
+                date: new Date().toISOString(),
+                device: navigator.userAgent
+            };
+
+            let results = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            results.push(result);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+
+            alert(`결과 저장 완료!\n측정 시간: ${formatTime(elapsed)}\n총 ${results.length}회 기록됨`);
+        }
+
+        // 통계 계산
+        function calculateStats(results) {
+            if (results.length === 0) {
+                return { count: 0, mean: 0, std: 0, cv: 0, min: 0, max: 0 };
+            }
+
+            const times = results.map(r => r.time);
+            const count = times.length;
+            const mean = times.reduce((a, b) => a + b, 0) / count;
+            const variance = times.reduce((sum, t) => sum + Math.pow(t - mean, 2), 0) / count;
+            const std = Math.sqrt(variance);
+            const cv = (std / mean) * 100;
+            const min = Math.min(...times);
+            const max = Math.max(...times);
+
+            return { count, mean, std, cv, min, max };
+        }
+
+        // 리포트 화면 표시
+        function showReport() {
+            const results = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const stats = calculateStats(results);
+
+            // 통계 표시
+            document.getElementById('statCount').textContent = stats.count;
+            document.getElementById('statMean').textContent = stats.count > 0 ? formatTime(stats.mean) : '--';
+            document.getElementById('statStd').textContent = stats.count > 0 ? (stats.std / 1000).toFixed(3) + 's' : '--';
+            document.getElementById('statCV').textContent = stats.count > 0 ? stats.cv.toFixed(2) + '%' : '--';
+            document.getElementById('statMin').textContent = stats.count > 0 ? formatTime(stats.min) : '--';
+            document.getElementById('statMax').textContent = stats.count > 0 ? formatTime(stats.max) : '--';
+
+            // 기록 목록 표시
+            const historyList = document.getElementById('historyList');
+            if (results.length === 0) {
+                historyList.innerHTML = '<p style="color: #888; text-align: center;">저장된 기록이 없습니다</p>';
+            } else {
+                historyList.innerHTML = results.map((r, i) => `
+                    <div class="history-item">
+                        <span>#${i + 1}</span>
+                        <span>${r.timeFormatted}</span>
+                        <span>${new Date(r.date).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                `).reverse().join('');
+            }
+
+            // 기기 정보
+            document.getElementById('deviceInfo').textContent = /Mobile|Android|iPhone/i.test(navigator.userAgent) ? '모바일' : 'PC';
+            document.getElementById('browserInfo').textContent = navigator.userAgent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/)?.[0] || 'Unknown';
+            document.getElementById('testDate').textContent = new Date().toLocaleDateString('ko-KR');
+
+            document.getElementById('reportScreen').style.display = 'flex';
+        }
+
+        // CSV 내보내기
+        function exportCSV() {
+            const results = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            if (results.length === 0) {
+                alert('내보낼 기록이 없습니다.');
+                return;
+            }
+
+            const stats = calculateStats(results);
+
+            let csv = 'AI 보행 측정 테스트 리포트\n';
+            csv += `테스트 날짜,${new Date().toLocaleDateString('ko-KR')}\n`;
+            csv += `기기,${navigator.userAgent}\n`;
+            csv += '\n';
+            csv += '통계 요약\n';
+            csv += `측정 횟수,${stats.count}\n`;
+            csv += `평균 (ms),${stats.mean.toFixed(2)}\n`;
+            csv += `표준편차 (ms),${stats.std.toFixed(2)}\n`;
+            csv += `CV%,${stats.cv.toFixed(2)}\n`;
+            csv += `최소 (ms),${stats.min.toFixed(2)}\n`;
+            csv += `최대 (ms),${stats.max.toFixed(2)}\n`;
+            csv += '\n';
+            csv += '측정 기록\n';
+            csv += '번호,시간 (ms),시간 (포맷),날짜\n';
+            results.forEach((r, i) => {
+                csv += `${i + 1},${r.time.toFixed(2)},${r.timeFormatted},${new Date(r.date).toLocaleString('ko-KR')}\n`;
+            });
+
+            // 다운로드
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `ai_measure_report_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // 기록 삭제
+        function clearResults() {
+            if (confirm('모든 측정 기록을 삭제하시겠습니까?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                showReport(); // 화면 갱신
+                alert('기록이 삭제되었습니다.');
+            }
+        }
+
+        // 이벤트 리스너
+        startBtn.addEventListener('click', initPose);
+
+        document.getElementById('guideBtn').addEventListener('click', () => {
+            window.location.href = 'guide.html';
+        });
+
+        resetBtn.addEventListener('click', resetMeasurement);
+
+        exitBtn.addEventListener('click', stopCamera);
+
+        gate2mSlider.addEventListener('input', updateGatePositions);
+        gate12mSlider.addEventListener('input', updateGatePositions);
+
+        retryBtn.addEventListener('click', () => {
+            resetMeasurement();
+        });
+
+        closeResultBtn.addEventListener('click', () => {
+            resultScreen.style.display = 'none';
+        });
+
+        // 리포트 이벤트
+        document.getElementById('saveResultBtn').addEventListener('click', () => {
+            saveResult();
+        });
+
+        document.getElementById('viewReportBtn').addEventListener('click', () => {
+            resultScreen.style.display = 'none';
+            showReport();
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', exportCSV);
+        document.getElementById('clearBtn').addEventListener('click', clearResults);
+        document.getElementById('closeReportBtn').addEventListener('click', () => {
+            document.getElementById('reportScreen').style.display = 'none';
+        });
+    </script>
+</body>
+</html>
