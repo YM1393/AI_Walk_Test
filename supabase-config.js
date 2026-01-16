@@ -1,9 +1,16 @@
+// ============================================
 // Supabase Configuration
+// 아래 값들을 본인의 Supabase 프로젝트 값으로 변경하세요
+// Supabase Dashboard > Settings > API 에서 확인 가능
+// ============================================
+
 const SUPABASE_URL = 'https://qnlhqwwyjkppynnjpmlj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubGhxd3d5amtwcHlubmpwbWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1NDMxOTIsImV4cCI6MjA4NDExOTE5Mn0.liWCzcXKO6UrRDO5YpgHpdhQNNn-Oa6bsIuDMK4EuPM';
 
+// ============================================
+
 // Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Admin credentials (hardcoded as requested)
 const ADMIN_EMAIL = 'admin@admin.com';
@@ -13,7 +20,7 @@ const ADMIN_PASSWORD = 'admin123';
 const auth = {
     // Sign up new user
     async signUp(email, password, name, role = 'therapist') {
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error } = await supabaseClient.auth.signUp({
             email,
             password,
             options: {
@@ -25,7 +32,7 @@ const auth = {
 
         // Create user profile in users table
         if (data.user) {
-            await supabase.from('users').insert({
+            await supabaseClient.from('users').insert({
                 id: data.user.id,
                 email,
                 name,
@@ -38,7 +45,7 @@ const auth = {
 
     // Sign in
     async signIn(email, password) {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
             email,
             password
         });
@@ -49,17 +56,17 @@ const auth = {
 
     // Sign out
     async signOut() {
-        const { error } = await supabase.auth.signOut();
+        const { error } = await supabaseClient.auth.signOut();
         if (error) throw error;
     },
 
     // Get current user
     async getCurrentUser() {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await supabaseClient.auth.getUser();
         if (!user) return null;
 
         // Get user profile
-        const { data: profile } = await supabase
+        const { data: profile } = await supabaseClient
             .from('users')
             .select('*')
             .eq('id', user.id)
@@ -82,7 +89,7 @@ const patients = {
         const user = await auth.getCurrentUser();
         if (!user) return [];
 
-        const query = supabase.from('patients').select('*');
+        const query = supabaseClient.from('patients').select('*');
 
         // Admin sees all, therapist sees only their patients
         if (user.profile?.role !== 'admin') {
@@ -96,7 +103,7 @@ const patients = {
 
     // Get all patients (admin only)
     async getAllPatients() {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('patients')
             .select('*, users(name, email)')
             .order('created_at', { ascending: false });
@@ -109,7 +116,7 @@ const patients = {
         const user = await auth.getCurrentUser();
         if (!user) throw new Error('Not authenticated');
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('patients')
             .insert({
                 ...patient,
@@ -124,7 +131,7 @@ const patients = {
 
     // Update patient
     async updatePatient(id, updates) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('patients')
             .update(updates)
             .eq('id', id)
@@ -137,7 +144,7 @@ const patients = {
 
     // Delete patient
     async deletePatient(id) {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('patients')
             .delete()
             .eq('id', id);
@@ -153,7 +160,7 @@ const measurements = {
         const user = await auth.getCurrentUser();
         if (!user) throw new Error('Not authenticated');
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('measurements')
             .insert({
                 patient_id: patientId,
@@ -171,7 +178,7 @@ const measurements = {
 
     // Get measurements for a patient
     async getPatientMeasurements(patientId) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('measurements')
             .select('*')
             .eq('patient_id', patientId)
@@ -183,7 +190,7 @@ const measurements = {
 
     // Get all measurements (admin)
     async getAllMeasurements() {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('measurements')
             .select('*, patients(name), users(name)')
             .order('created_at', { ascending: false });
@@ -197,7 +204,7 @@ const measurements = {
         const user = await auth.getCurrentUser();
         if (!user) return [];
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('measurements')
             .select('*, patients(name)')
             .eq('therapist_id', user.id)
@@ -212,7 +219,7 @@ const measurements = {
 const therapists = {
     // Get all therapists
     async getAllTherapists() {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('users')
             .select('*')
             .eq('role', 'therapist')

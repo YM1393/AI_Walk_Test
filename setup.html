@@ -154,12 +154,12 @@
                 if (typeof window.supabase === 'undefined') {
                     throw new Error('Supabase SDK not loaded');
                 }
-                if (typeof supabase === 'undefined') {
+                if (typeof supabaseClient === 'undefined') {
                     throw new Error('Supabase client not initialized');
                 }
 
                 // Test connection
-                const { data, error } = await supabase.from('users').select('count').limit(1);
+                const { data, error } = await supabaseClient.from('users').select('count').limit(1);
                 if (error && !error.message.includes('0 rows')) {
                     log(`DB connection test: ${error.message}`, 'error');
                 }
@@ -182,7 +182,7 @@
 
             try {
                 // First, try to sign up the admin
-                const { data, error } = await supabase.auth.signUp({
+                const { data, error } = await supabaseClient.auth.signUp({
                     email: 'admin@admin.com',
                     password: 'admin123',
                     options: {
@@ -205,7 +205,7 @@
 
                     if (data.user) {
                         // Add to users table
-                        const { error: insertError } = await supabase.from('users').upsert({
+                        const { error: insertError } = await supabaseClient.from('users').upsert({
                             id: data.user.id,
                             email: 'admin@admin.com',
                             name: 'Admin',
@@ -231,7 +231,7 @@
         async function addAdminToUsersTable() {
             try {
                 // Try to sign in first to get the user ID
-                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
                     email: 'admin@admin.com',
                     password: 'admin123'
                 });
@@ -242,7 +242,7 @@
                 }
 
                 if (signInData.user) {
-                    const { error: upsertError } = await supabase.from('users').upsert({
+                    const { error: upsertError } = await supabaseClient.from('users').upsert({
                         id: signInData.user.id,
                         email: 'admin@admin.com',
                         name: 'Admin',
@@ -258,7 +258,7 @@
                 }
 
                 // Sign out after
-                await supabase.auth.signOut();
+                await supabaseClient.auth.signOut();
             } catch (error) {
                 log(`users 테이블 추가 실패: ${error.message}`, 'error');
             }
@@ -268,7 +268,7 @@
         async function checkAdminAccount() {
             log('관리자 계정 확인 중...');
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('email', 'admin@admin.com')
@@ -291,7 +291,7 @@
         async function testLogin() {
             log('로그인 테스트 시작...');
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email: 'admin@admin.com',
                     password: 'admin123'
                 });
@@ -319,7 +319,7 @@
         async function testLogout() {
             log('로그아웃 중...');
             try {
-                await supabase.auth.signOut();
+                await supabaseClient.auth.signOut();
                 log('로그아웃 완료', 'success');
                 showStatus('loginStatus', '로그아웃 완료', true);
             } catch (error) {
@@ -331,7 +331,7 @@
         async function checkSession() {
             log('세션 확인 중...');
             try {
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session } } = await supabaseClient.auth.getSession();
                 const sessionInfo = document.getElementById('sessionInfo');
                 const sessionData = document.getElementById('sessionData');
 
