@@ -66,11 +66,30 @@ const auth = {
         if (!user) return null;
 
         // Get user profile
-        const { data: profile } = await supabaseClient
+        let { data: profile } = await supabaseClient
             .from('users')
             .select('*')
             .eq('id', user.id)
             .single();
+
+        // If user not in users table, create it
+        if (!profile) {
+            const role = user.email === 'admin@admin.com' ? 'admin' : 'therapist';
+            const name = user.user_metadata?.name || user.email.split('@')[0];
+
+            const { data: newProfile } = await supabaseClient
+                .from('users')
+                .upsert({
+                    id: user.id,
+                    email: user.email,
+                    name: name,
+                    role: role
+                })
+                .select()
+                .single();
+
+            profile = newProfile;
+        }
 
         return { ...user, profile };
     },
