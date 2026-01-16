@@ -283,16 +283,40 @@
         const errorMessage = document.getElementById('errorMessage');
         const loading = document.getElementById('loading');
 
+        // Check if Supabase is loaded
+        window.addEventListener('load', () => {
+            console.log('Page loaded');
+            if (typeof window.supabase === 'undefined') {
+                showError('Supabase SDK 로딩 실패. 인터넷 연결을 확인하세요.');
+                console.error('Supabase SDK not loaded');
+                return;
+            }
+            if (typeof supabase === 'undefined') {
+                showError('Supabase 클라이언트 초기화 실패.');
+                console.error('Supabase client not initialized');
+                return;
+            }
+            console.log('Supabase ready');
+            checkAuth();
+        });
+
         // Check if already logged in
         async function checkAuth() {
-            const user = await auth.getCurrentUser();
-            if (user) {
-                redirectUser(user);
+            try {
+                console.log('Checking auth...');
+                const user = await auth.getCurrentUser();
+                console.log('Current user:', user);
+                if (user) {
+                    redirectUser(user);
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
             }
         }
 
         // Redirect based on user role
         function redirectUser(user) {
+            console.log('Redirecting user with role:', user.profile?.role);
             if (user.profile?.role === 'admin') {
                 window.location.href = 'admin.html';
             } else {
@@ -304,6 +328,7 @@
         function showError(message) {
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
+            console.error('Error shown:', message);
         }
 
         // Hide error
@@ -319,6 +344,8 @@
             const email = emailInput.value.trim();
             const password = passwordInput.value;
 
+            console.log('Login attempt for:', email);
+
             if (!email || !password) {
                 showError('이메일과 비밀번호를 입력해주세요.');
                 return;
@@ -329,24 +356,34 @@
             loading.style.display = 'block';
 
             try {
-                await auth.signIn(email, password);
+                console.log('Calling auth.signIn...');
+                const result = await auth.signIn(email, password);
+                console.log('Sign in result:', result);
+
+                console.log('Getting current user...');
                 const user = await auth.getCurrentUser();
+                console.log('User data:', user);
+
+                if (!user) {
+                    throw new Error('로그인 후 사용자 정보를 가져올 수 없습니다.');
+                }
+
                 redirectUser(user);
             } catch (error) {
+                console.error('Login error:', error);
                 form.style.display = 'block';
                 loading.style.display = 'none';
                 loginBtn.disabled = false;
 
                 if (error.message.includes('Invalid login credentials')) {
                     showError('이메일 또는 비밀번호가 올바르지 않습니다.');
+                } else if (error.message.includes('Email not confirmed')) {
+                    showError('이메일 인증이 필요합니다. Supabase에서 이메일 확인을 비활성화하세요.');
                 } else {
-                    showError(error.message);
+                    showError(error.message || '로그인 중 오류가 발생했습니다.');
                 }
             }
         });
-
-        // Check auth on page load
-        checkAuth();
     </script>
 </body>
 </html>
