@@ -30,13 +30,14 @@ const auth = {
 
         if (error) throw error;
 
-        // Create user profile in users table
+        // Create user profile in users table with pending status
         if (data.user) {
             await supabaseClient.from('users').insert({
                 id: data.user.id,
                 email,
                 name,
-                role
+                role,
+                status: role === 'admin' ? 'approved' : 'pending'
             });
         }
 
@@ -76,6 +77,7 @@ const auth = {
         if (!profile) {
             const role = user.email === 'admin@admin.com' ? 'admin' : 'therapist';
             const name = user.user_metadata?.name || user.email.split('@')[0];
+            const status = role === 'admin' ? 'approved' : 'pending';
 
             const { data: newProfile } = await supabaseClient
                 .from('users')
@@ -83,7 +85,8 @@ const auth = {
                     id: user.id,
                     email: user.email,
                     name: name,
-                    role: role
+                    role: role,
+                    status: status
                 })
                 .select()
                 .single();

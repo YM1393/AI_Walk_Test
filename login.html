@@ -296,9 +296,29 @@
             }
         }
 
-        // Redirect based on user role
-        function redirectUser(user) {
-            console.log('Redirecting user with role:', user.profile?.role);
+        // Redirect based on user role and status
+        async function redirectUser(user) {
+            console.log('Redirecting user with role:', user.profile?.role, 'status:', user.profile?.status);
+
+            // Check approval status for non-admin users
+            if (user.profile?.role !== 'admin') {
+                if (user.profile?.status === 'pending') {
+                    await auth.signOut();
+                    showError('가입 승인 대기 중입니다. 관리자의 승인을 기다려주세요.');
+                    form.style.display = 'block';
+                    loading.style.display = 'none';
+                    loginBtn.disabled = false;
+                    return;
+                } else if (user.profile?.status === 'rejected') {
+                    await auth.signOut();
+                    showError('가입이 거절되었습니다. 관리자에게 문의하세요.');
+                    form.style.display = 'block';
+                    loading.style.display = 'none';
+                    loginBtn.disabled = false;
+                    return;
+                }
+            }
+
             if (user.profile?.role === 'admin') {
                 window.location.href = 'admin.html';
             } else {

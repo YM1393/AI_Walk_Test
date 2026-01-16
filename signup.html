@@ -351,15 +351,15 @@
                 await auth.signUp(email, password, name, 'therapist');
                 form.style.display = 'block';
                 loading.style.display = 'none';
-                showSuccess('회원가입이 완료되었습니다! 이메일을 확인해주세요.');
+                showSuccess('회원가입 신청이 완료되었습니다! 관리자 승인 후 로그인이 가능합니다.');
 
                 // Clear form
                 form.reset();
 
-                // Redirect to login after 2 seconds
+                // Redirect to login after 3 seconds
                 setTimeout(() => {
                     window.location.href = 'login.html';
-                }, 2000);
+                }, 3000);
 
             } catch (error) {
                 form.style.display = 'block';

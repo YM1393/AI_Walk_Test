@@ -324,6 +324,32 @@
             background: var(--danger);
         }
 
+        .badge-pending {
+            background: var(--warning);
+        }
+
+        .badge-approved {
+            background: var(--primary);
+        }
+
+        .badge-rejected {
+            background: var(--text-muted);
+        }
+
+        .pending-badge {
+            background: var(--danger);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 6px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -430,13 +456,29 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" data-tab="therapists">물리치료사</button>
+            <button class="tab active" data-tab="pending">가입 승인 <span id="pendingBadge" class="pending-badge" style="display:none;">0</span></button>
+            <button class="tab" data-tab="therapists">물리치료사</button>
             <button class="tab" data-tab="patients">환자 목록</button>
             <button class="tab" data-tab="measurements">측정 기록</button>
         </div>
 
+        <!-- Pending Approvals Tab -->
+        <div id="pendingTab" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">가입 승인 대기</h2>
+                </div>
+                <div class="table-container" id="pendingTable">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Therapists Tab -->
-        <div id="therapistsTab" class="tab-content active">
+        <div id="therapistsTab" class="tab-content">
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">물리치료사 목록</h2>
@@ -500,6 +542,7 @@
         let therapistsList = [];
         let patientsList = [];
         let measurementsList = [];
+        let pendingList = [];
 
         // Check authentication
         async function checkAuth() {
@@ -521,11 +564,143 @@
         // Load all data
         async function loadData() {
             await Promise.all([
+                loadPendingUsers(),
                 loadTherapists(),
                 loadPatients(),
                 loadMeasurements()
             ]);
             updateStats();
+        }
+
+        // Load pending users
+        async function loadPendingUsers() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                pendingList = data || [];
+                renderPending();
+                updatePendingBadge();
+            } catch (error) {
+                console.error('Error loading pending users:', error);
+            }
+        }
+
+        // Update pending badge
+        function updatePendingBadge() {
+            const badge = document.getElementById('pendingBadge');
+            if (pendingList.length > 0) {
+                badge.textContent = pendingList.length;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Render pending users
+        function renderPending() {
+            if (pendingList.length === 0) {
+                document.getElementById('pendingTable').innerHTML = `
+                    <div class="empty-state">
+                        <p>승인 대기 중인 가입 요청이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('pendingTable').innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>이름</th>
+                            <th>이메일</th>
+                            <th>신청일</th>
+                            <th>작업</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${pendingList.map(u => `
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-avatar">${getInitials(u.name)}</div>
+                                        <div>
+                                            <div class="user-name">${u.name || '이름 없음'}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>${u.email}</td>
+                                <td>${formatDateTime(u.created_at)}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-primary btn-sm" onclick="approveUser('${u.id}')">승인</button>
+                                        <button class="btn btn-danger btn-sm" onclick="rejectUser('${u.id}')">거절</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Approve user
+        async function approveUser(userId) {
+            if (!confirm('이 사용자의 가입을 승인하시겠습니까?')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .update({ status: 'approved' })
+                    .eq('id', userId);
+
+                if (error) throw error;
+                alert('승인되었습니다.');
+                await loadPendingUsers();
+                await loadTherapists();
+            } catch (error) {
+                alert('오류: ' + error.message);
+            }
+        }
+
+        // Reject user
+        async function rejectUser(userId) {
+            if (!confirm('이 사용자의 가입을 거절하시겠습니까?')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .update({ status: 'rejected' })
+                    .eq('id', userId);
+
+                if (error) throw error;
+                alert('거절되었습니다.');
+                await loadPendingUsers();
+            } catch (error) {
+                alert('오류: ' + error.message);
+            }
+        }
+
+        // Delete user
+        async function deleteUser(userId, email) {
+            if (!confirm(`정말로 ${email} 사용자를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .delete()
+                    .eq('id', userId);
+
+                if (error) throw error;
+                alert('삭제되었습니다.');
+                await loadTherapists();
+            } catch (error) {
+                alert('오류: ' + error.message);
+            }
         }
 
         // Load therapists
@@ -577,6 +752,16 @@
             return name.charAt(0).toUpperCase();
         }
 
+        // Get status badge
+        function getStatusBadge(status) {
+            const badges = {
+                'approved': '<span class="badge badge-approved">승인됨</span>',
+                'pending': '<span class="badge badge-pending">대기중</span>',
+                'rejected': '<span class="badge badge-rejected">거절됨</span>'
+            };
+            return badges[status] || badges['pending'];
+        }
+
         // Render therapists
         function renderTherapists(searchTerm = '') {
             let filtered = therapistsList;
@@ -603,8 +788,10 @@
                         <tr>
                             <th>이름</th>
                             <th>이메일</th>
+                            <th>상태</th>
                             <th>환자 수</th>
                             <th>가입일</th>
+                            <th>작업</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -621,14 +808,42 @@
                                         </div>
                                     </td>
                                     <td>${t.email}</td>
+                                    <td>${getStatusBadge(t.status)}</td>
                                     <td>${patientCount}명</td>
                                     <td>${formatDateTime(t.created_at)}</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            ${t.status === 'approved' ?
+                                                `<button class="btn btn-outline btn-sm" onclick="revokeUser('${t.id}', '${t.email}')">권한 해제</button>` :
+                                                `<button class="btn btn-primary btn-sm" onclick="approveUser('${t.id}')">승인</button>`
+                                            }
+                                            <button class="btn btn-danger btn-sm" onclick="deleteUser('${t.id}', '${t.email}')">삭제</button>
+                                        </div>
+                                    </td>
                                 </tr>
                             `;
                         }).join('')}
                     </tbody>
                 </table>
             `;
+        }
+
+        // Revoke user access
+        async function revokeUser(userId, email) {
+            if (!confirm(`${email} 사용자의 권한을 해제하시겠습니까?`)) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('users')
+                    .update({ status: 'rejected' })
+                    .eq('id', userId);
+
+                if (error) throw error;
+                alert('권한이 해제되었습니다.');
+                await loadTherapists();
+            } catch (error) {
+                alert('오류: ' + error.message);
+            }
         }
 
         // Render patients
