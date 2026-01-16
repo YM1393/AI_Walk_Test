@@ -469,7 +469,7 @@
         <div class="icon">🤖</div>
         <h1>AI 보행 측정</h1>
         <p>물리치료 임상 보조 소프트웨어</p>
-        <p style="font-size: 12px;">카메라로 환자를 촬영하면<br>2m, 12m 통과를 자동 감지합니다</p>
+        <p style="font-size: 12px;">환자 뒤에서 촬영하면<br>2m, 12m 통과를 자동 감지합니다</p>
         <button id="startBtn">측정 시작</button>
         <button id="guideBtn" style="background: #2196F3; margin-top: 20px; padding: 10px 30px; font-size: 14px;">📋 설치 가이드</button>
     </div>
@@ -489,10 +489,10 @@
         <canvas id="canvas"></canvas>
 
         <!-- 게이트 라인 -->
-        <div id="gate2mLine" class="gate-line" style="top: 40%;">
+        <div id="gate2mLine" class="gate-line" style="top: 70%;">
             <span class="gate-label">2m 시작</span>
         </div>
-        <div id="gate12mLine" class="gate-line" style="top: 70%;">
+        <div id="gate12mLine" class="gate-line" style="top: 35%;">
             <span class="gate-label">12m 종료</span>
         </div>
     </div>
@@ -500,7 +500,7 @@
     <!-- 오버레이 -->
     <div id="overlay" class="hidden">
         <div id="status">대기 중...</div>
-        <div id="info">환자가 2m 라인을 통과하면 자동 시작</div>
+        <div id="info">환자가 앞으로 걸어가 2m 라인을 통과하면 자동 시작</div>
         <div id="timerDisplay">00:00.00</div>
         <div id="splitTimes">
             <span class="split-time" id="split2m">2m: 대기</span>
@@ -511,12 +511,12 @@
     <!-- 게이트 위치 조절 -->
     <div id="gateControls">
         <div class="gate-slider">
-            <label>2m</label>
-            <input type="range" id="gate2mSlider" min="10" max="50" value="40">
+            <label>12m</label>
+            <input type="range" id="gate12mSlider" min="15" max="50" value="35">
         </div>
         <div class="gate-slider">
-            <label>12m</label>
-            <input type="range" id="gate12mSlider" min="50" max="90" value="70">
+            <label>2m</label>
+            <input type="range" id="gate2mSlider" min="50" max="85" value="70">
         </div>
     </div>
 
@@ -664,8 +664,10 @@
         let gateTimes = { '2m': null, '12m': null };
 
         // 게이트 위치 (화면 비율, 0-100%)
-        let gate2mPosition = 40;
-        let gate12mPosition = 70;
+        // 측후면 촬영: 환자가 멀어지면 화면 위쪽으로 이동
+        // 2m는 화면 아래쪽(가까움), 12m는 화면 위쪽(멀리)
+        let gate2mPosition = 70;  // 2m 라인 (화면 하단 - 가까운 위치)
+        let gate12mPosition = 35; // 12m 라인 (화면 상단 - 먼 위치)
 
         // 히스테리시스 (연속 프레임 체크)
         const HYSTERESIS_FRAMES = 3;
@@ -896,10 +898,11 @@
         }
 
         // 게이트 통과 체크 (히스테리시스 적용)
+        // 측후면 촬영: 환자가 멀어지면 footY가 감소함 (화면 위쪽으로 이동)
         function checkGatePass(footY) {
             if (measureState === MeasureState.WAITING) {
-                // 2m 게이트 통과 체크
-                if (footY >= gate2mPosition) {
+                // 2m 게이트 통과 체크 (발이 2m 라인보다 위로 올라가면 통과)
+                if (footY <= gate2mPosition) {
                     gate2mFrameCount++;
                     if (gate2mFrameCount >= HYSTERESIS_FRAMES) {
                         // 2m 통과 확정 → 타이머 시작
@@ -909,8 +912,8 @@
                     gate2mFrameCount = Math.max(0, gate2mFrameCount - 1);
                 }
             } else if (measureState === MeasureState.MEASURING) {
-                // 12m 게이트 통과 체크
-                if (footY >= gate12mPosition) {
+                // 12m 게이트 통과 체크 (발이 12m 라인보다 위로 올라가면 통과)
+                if (footY <= gate12mPosition) {
                     gate12mFrameCount++;
                     if (gate12mFrameCount >= HYSTERESIS_FRAMES) {
                         // 12m 통과 확정 → 타이머 종료
@@ -1038,7 +1041,7 @@
             gate12mLine.classList.add('inactive');
 
             statusEl.textContent = '대기 중...';
-            infoEl.textContent = '환자가 2m 라인을 통과하면 자동 시작';
+            infoEl.textContent = '환자가 앞으로 걸어가 2m 라인을 통과하면 자동 시작';
 
             resultScreen.style.display = 'none';
             hideWarning();
